@@ -1,0 +1,67 @@
+inverter:
+  address: "sungrow:502"
+
+metrics:
+  - name: device_info
+    help: "Device Info (constant value)"
+    type: gauge
+    value:
+      fromExpression: 1
+    labels:
+      - name: type
+        value:
+          fromRegister:
+            type: u16
+            address: 5000
+            mapValue:
+              "0xE00": "SH5.0RT"
+              "0xE03": "SH10RT"
+      - name: sn
+        value:
+          fromRegister:
+            type: string
+            address: 4990
+            length: 10
+            interval: once
+      - name: arm_sw_ver
+        value:
+          fromRegister:
+            type: string
+            address: 4954
+            length: 15
+            interval: once
+      - name: dsp_sw_ver
+        value:
+          fromRegister:
+            type: string
+            address: 4969
+            length: 15
+            interval: once
+  - name: mppt1_voltage_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5011
+        mapValue: x/10.0
+  - name: mppt1_current_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5012
+        mapValue: x/10.0
+  - name: mppt2_voltage_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5013
+        mapValue: x/10.0
+  - name: mppt2_current_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5014
+        mapValue: x/10.0
