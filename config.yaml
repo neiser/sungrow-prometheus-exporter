@@ -14,29 +14,45 @@ metrics:
             type: u16
             address: 5000
             mapValue:
-              "xE00": "'SH5.0RT'"
-              "xE03": "'SH10RT'"
+              0xe00: SH5.0RT
+              0xe03: SH10RT
       - name: sn
         value:
           fromRegister:
             type: string
             address: 4990
             length: 10
-            interval: once
       - name: arm_sw_ver
         value:
           fromRegister:
             type: string
             address: 4954
             length: 15
-            interval: once
       - name: dsp_sw_ver
         value:
           fromRegister:
             type: string
             address: 4969
             length: 15
-            interval: once
+
+  - name: output_energy_daily
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 5003
+        mapValue:
+          x: x/10.0
+
+  - name: output_energy_total
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 5004
+        mapValue:
+          x: x/10.0
+
   - name: mppt1_voltage_volts
     type: gauge
     value:
@@ -44,7 +60,7 @@ metrics:
         type: u16
         address: 5011
         mapValue:
-          "'x'": x/10.0
+          x: x/10.0
   - name: mppt1_current_amperes
     type: gauge
     value:
@@ -52,7 +68,7 @@ metrics:
         type: u16
         address: 5012
         mapValue:
-          "'x'": x/10.0
+          x: x/10.0
   - name: mppt2_voltage_volts
     type: gauge
     value:
@@ -60,7 +76,7 @@ metrics:
         type: u16
         address: 5013
         mapValue:
-          "'x'": x/10.0
+          x: x/10.0
   - name: mppt2_current_amperes
     type: gauge
     value:
@@ -68,4 +84,4 @@ metrics:
         type: u16
         address: 5014
         mapValue:
-          "'x'": x/10.0
+          x: x/10.0

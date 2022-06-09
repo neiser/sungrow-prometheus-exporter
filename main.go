@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
 	configPkg "sungrow-prometheus-exporter/config"
+	"sungrow-prometheus-exporter/register"
 	"time"
 )
 
@@ -41,13 +42,13 @@ func main() {
 
 	for _, metric := range config.Metrics {
 		if registerValue, ok := metric.Value().(*configPkg.RegisterValue); ok {
-			if registerValue.Type == configPkg.U16RegisterType {
-				results, err := client.ReadInputRegisters(registerValue.Address-1, 1)
-				if err != nil {
-					panic(err.Error())
-				}
-				log.Infof("%s=%f", metric.Name, float64(uint16(results[1])+256*uint16(results[0]))/10)
+			value, err := register.New(registerValue).ReadWith(func(address, quantity uint16) ([]byte, error) {
+				return client.ReadInputRegisters(address-1, quantity)
+			})
+			if err != nil {
+				panic(err.Error())
 			}
+			log.Infof("%s=%f", metric.Name, value.AsFloat64())
 		}
 
 	}

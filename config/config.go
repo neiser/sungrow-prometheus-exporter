@@ -91,34 +91,84 @@ type ExpressionValue struct {
 }
 
 type RegisterValue struct {
-	Type     RegisterType `yaml:"type"`
-	Address  uint16       `yaml:"address"`
-	Length   int          `yaml:"length"`
-	Interval string       `yaml:"interval"`
-	MapValue MapValue     `yaml:"mapValue"`
+	Type     RegisterType   `yaml:"type"`
+	Address  uint16         `yaml:"address"`
+	Length   int            `yaml:"length"`
+	Interval string         `yaml:"interval"`
+	MapValue MapValueGetter `yaml:"mapValue"`
 }
 
-type MapValue map[*govaluate.EvaluableExpression]*govaluate.EvaluableExpression
+type MapValue interface {
+}
 
-func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
+type MapValueGetter func() MapValue
+
+type FunctionMapValue struct {
+	Map func(value int64) float64
+}
+
+type EnumMapValue struct {
+	Map func(value int64) string
+}
+
+func (getter *MapValueGetter) UnmarshalYAML(node *yaml.Node) error {
 	m := map[string]string{}
 	err := node.Decode(m)
 	if err != nil {
 		return err
 	}
-	*mapValue = make(MapValue)
-	for k, v := range m {
-		kExpr, err := govaluate.NewEvaluableExpression(k)
-		if err != nil {
-			return errors.Wrapf(err, "cannot parse key '%s'", k)
+	switch len(m) {
+	case 0:
+		return &yaml.TypeError{Errors: []string{"mapValue should not be empty"}}
+	case 1:
+		{
+			for x, y := range m {
+				if len(x) == 1 {
+					expression, err := govaluate.NewEvaluableExpression(y)
+					if err != nil {
+						continue
+					}
+					*getter = func() MapValue {
+						return &FunctionMapValue{Map: func(value int64) float64 {
+							y, _ := expression.Evaluate(map[string]interface{}{x: value})
+							return y.(float64)
+						}}
+					}
+					return nil
+				}
+			}
 		}
-		vExpr, err := govaluate.NewEvaluableExpression(v)
-		if err != nil {
-			return errors.Wrapf(err, "cannot parse value '%s'", v)
+		fallthrough
+	default:
+		{
+			enumMap := make(map[int64]string)
+			for x, y := range m {
+				intExpr, err := govaluate.NewEvaluableExpression(x)
+				if err != nil {
+					return errors.Wrapf(err, "cannot parse '%s' as integer expression", x)
+				}
+				result, err := intExpr.Evaluate(map[string]interface{}{})
+				if err != nil {
+					return errors.Wrapf(err, "cannot eval '%s' as integer expression", x)
+				}
+				if floatValue, ok := result.(float64); ok {
+					intValue := int64(floatValue)
+					if _, contains := enumMap[intValue]; contains {
+						return &yaml.TypeError{Errors: []string{"duplicate key for enum map"}}
+					}
+					enumMap[intValue] = y
+				} else {
+					return &yaml.TypeError{Errors: []string{"expression did not eval to int value"}}
+				}
+			}
+			*getter = func() MapValue {
+				return &EnumMapValue{Map: func(value int64) string {
+					return enumMap[value]
+				}}
+			}
+			return nil
 		}
-		(*mapValue)[kExpr] = vExpr
 	}
-	return nil
 }
 
 type MetricType string
