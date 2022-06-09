@@ -4,8 +4,10 @@ go 1.18
 
 require (
 	github.com/goburrow/modbus v0.1.0
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/sirupsen/logrus v1.8.1
+	gopkg.in/Knetic/govaluate.v3 v3.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"gopkg.in/Knetic/govaluate.v3"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -46,10 +48,6 @@ type Value interface {
 
 type ValueGetter func() Value
 
-type ExpressionValue struct {
-	Expression string
-}
-
 func (getter *ValueGetter) UnmarshalYAML(node *yaml.Node) error {
 	var m map[ValueType]interface{}
 	err := node.Decode(&m)
@@ -58,6 +56,17 @@ func (getter *ValueGetter) UnmarshalYAML(node *yaml.Node) error {
 	}
 	if len(m) != 1 {
 		return &yaml.TypeError{Errors: []string{"expected exactly one key"}}
+	}
+	if value, ok := m[ExpressionValueType]; ok {
+		expression := fmt.Sprintf("%v", value)
+		evaluableExpression, err := govaluate.NewEvaluableExpression(expression)
+		if err != nil {
+			return errors.Wrapf(err, "cannot parse '%s'", expression)
+		}
+		*getter = func() Value {
+			return &ExpressionValue{Expression: evaluableExpression}
+		}
+		return nil
 	}
 	if value, ok := m[RegisterValueType]; ok {
 		registerValueBytes, err := yaml.Marshal(value)
@@ -74,14 +83,11 @@ func (getter *ValueGetter) UnmarshalYAML(node *yaml.Node) error {
 		}
 		return nil
 	}
-	if value, ok := m[ExpressionValueType]; ok {
-		expression := fmt.Sprintf("%s", value)
-		*getter = func() Value {
-			return &ExpressionValue{Expression: expression}
-		}
-		return nil
-	}
 	return &yaml.TypeError{Errors: []string{"unknown value type"}}
+}
+
+type ExpressionValue struct {
+	Expression *govaluate.EvaluableExpression
 }
 
 type RegisterValue struct {
@@ -89,6 +95,30 @@ type RegisterValue struct {
 	Address  uint16       `yaml:"address"`
 	Length   int          `yaml:"length"`
 	Interval string       `yaml:"interval"`
+	MapValue MapValue     `yaml:"mapValue"`
+}
+
+type MapValue map[*govaluate.EvaluableExpression]*govaluate.EvaluableExpression
+
+func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
+	m := map[string]string{}
+	err := node.Decode(m)
+	if err != nil {
+		return err
+	}
+	*mapValue = make(MapValue)
+	for k, v := range m {
+		kExpr, err := govaluate.NewEvaluableExpression(k)
+		if err != nil {
+			return errors.Wrapf(err, "cannot parse key '%s'", k)
+		}
+		vExpr, err := govaluate.NewEvaluableExpression(v)
+		if err != nil {
+			return errors.Wrapf(err, "cannot parse value '%s'", v)
+		}
+		(*mapValue)[kExpr] = vExpr
+	}
+	return nil
 }
 
 type MetricType string

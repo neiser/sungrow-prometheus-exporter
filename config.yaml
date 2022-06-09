@@ -14,8 +14,8 @@ metrics:
             type: u16
             address: 5000
             mapValue:
-              "0xE00": "SH5.0RT"
-              "0xE03": "SH10RT"
+              "xE00": "'SH5.0RT'"
+              "xE03": "'SH10RT'"
       - name: sn
         value:
           fromRegister:
@@ -43,25 +43,29 @@ metrics:
       fromRegister:
         type: u16
         address: 5011
-        mapValue: x/10.0
+        mapValue:
+          "'x'": x/10.0
   - name: mppt1_current_amperes
     type: gauge
     value:
       fromRegister:
         type: u16
         address: 5012
-        mapValue: x/10.0
+        mapValue:
+          "'x'": x/10.0
   - name: mppt2_voltage_volts
     type: gauge
     value:
       fromRegister:
         type: u16
         address: 5013
-        mapValue: x/10.0
+        mapValue:
+          "'x'": x/10.0
   - name: mppt2_current_amperes
     type: gauge
     value:
       fromRegister:
         type: u16
         address: 5014
-        mapValue: x/10.0
+        mapValue:
+          "'x'": x/10.0
