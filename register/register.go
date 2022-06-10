@@ -35,7 +35,7 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 	quantity := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
 	return &integerRegister{
 		register{address: registerConfig.Address},
-		mapper{
+		mappers{
 			mapToInt64: func(data []uint16) int64 {
 				result := T(0)
 				for i := uint16(0); i < quantity; i++ {
@@ -44,14 +44,16 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 				return int64(result)
 			},
 			mapToFloat64: func(value int64) float64 {
-				if functionMapper := registerConfig.MapValue.FunctionMapValue; functionMapper != nil {
-					return functionMapper.Map(value)
+				if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
+					return mapper(value)
 				}
 				return float64(value)
 			},
 			mapToString: func(value int64) string {
-				if enumMapper := registerConfig.MapValue.EnumMapValue; enumMapper != nil {
-					return enumMapper.Map(value)
+				if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
+					if mappedValue, ok := mapper[value]; ok {
+						return mappedValue
+					}
 				}
 				return fmt.Sprintf("%d", value)
 			},
@@ -65,7 +67,7 @@ type register struct {
 	address uint16
 }
 
-type mapper struct {
+type mappers struct {
 	mapToInt64   func(data []uint16) int64
 	mapToFloat64 func(value int64) float64
 	mapToString  func(value int64) string
@@ -73,12 +75,12 @@ type mapper struct {
 
 type integerRegister struct {
 	register
-	mapper
+	mappers
 	quantity uint16
 }
 
 type integerValue struct {
-	mapper
+	mappers
 	data []uint16
 }
 
@@ -99,5 +101,5 @@ func (register integerRegister) ReadWith(reader Reader) (Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &integerValue{register.mapper, data}, nil
+	return &integerValue{register.mappers, data}, nil
 }

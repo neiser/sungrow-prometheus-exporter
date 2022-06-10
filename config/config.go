@@ -2,11 +2,10 @@ package config
 
 import (
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/Knetic/govaluate.v3"
 	"gopkg.in/yaml.v3"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func ReadFromFile(filename string) (*Config, error) {
@@ -76,16 +75,8 @@ type Register struct {
 }
 
 type MapValue struct {
-	FunctionMapValue *FunctionMapValue
-	EnumMapValue     *EnumMapValue
-}
-
-type FunctionMapValue struct {
-	Map func(value int64) float64
-}
-
-type EnumMapValue struct {
-	Map func(value int64) string
+	ByFunction func(value int64) float64
+	ByEnumMap  map[int64]string
 }
 
 func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
@@ -103,47 +94,24 @@ func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
 				if len(x) == 1 {
 					expression, err := govaluate.NewEvaluableExpression(y)
 					if err != nil {
+						log.Warnf("Ignoring unparsable expression '%s' (caused by '%s'), will assume one-element enum map", y, err.Error())
 						continue
 					}
-					mapValue.FunctionMapValue = &FunctionMapValue{Map: func(value int64) float64 {
-						y, _ := expression.Evaluate(map[string]interface{}{x: value})
-						return y.(float64)
-					}}
+					mapValue.ByFunction = func(value int64) float64 {
+						result, err := expression.Evaluate(map[string]interface{}{x: value})
+						if err != nil {
+							panic(err.Error())
+						}
+						return result.(float64)
+					}
 					return nil
 				}
 			}
 		}
 		fallthrough
 	default:
-		{
-			enumMap := make(map[int64]string)
-			for x, y := range m {
-				intValue, err := parseInt(x)
-				if err != nil {
-					return errors.Wrapf(err, "cannot parse '%s' as integer", x)
-				}
-				enumMap[intValue] = y
-			}
-			mapValue.EnumMapValue = &EnumMapValue{Map: func(value int64) string {
-				return enumMap[value]
-			}}
-			return nil
-		}
+		return node.Decode(&mapValue.ByEnumMap)
 	}
-}
-
-func parseInt(s string) (int64, error) {
-	base := 10
-	if strings.HasPrefix(s, "0x") {
-		s = s[2:]
-		base = 16
-
-	}
-	result, err := strconv.ParseInt(s, base, 64)
-	if err != nil {
-		return 0, err
-	}
-	return result, nil
 }
 
 type MetricType string
