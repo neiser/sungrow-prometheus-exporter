@@ -27,7 +27,7 @@ func main() {
 		registerPrometheusMetric(reader, metricConfig)
 	}
 
-	const path = "/metrics"
+	const path = "/"
 	http.Handle(path, promhttp.Handler())
 	const addr = ":8080"
 	log.Infof("Serving at %s%s...", addr, path)
