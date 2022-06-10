@@ -52,7 +52,7 @@ func main() {
 			if err != nil {
 				panic(err.Error())
 			}
-			log.Infof("%s=%f", metric.Name, value.AsFloat64())
+			log.Infof("%s=%v", metric.Name, value.AsFloat64s())
 		}
 
 	}

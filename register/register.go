@@ -2,6 +2,7 @@ package register
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"reflect"
 	"sungrow-prometheus-exporter/config"
 )
@@ -14,7 +15,7 @@ type Register interface {
 
 type Value interface {
 	AsString() string
-	AsFloat64() float64
+	AsFloat64s() []float64
 }
 
 func NewFromConfig(registerConfig *config.Register) Register {
@@ -32,13 +33,17 @@ func NewFromConfig(registerConfig *config.Register) Register {
 }
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
-	quantity := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
+	width := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
+	length := 1
+	if registerConfig.Length > 1 {
+		length = registerConfig.Length
+	}
 	return &integerRegister{
 		register{address: registerConfig.Address},
 		mappers{
 			mapToInt64: func(data []uint16) int64 {
 				result := T(0)
-				for i := uint16(0); i < quantity; i++ {
+				for i := uint16(0); i < width; i++ {
 					result += T(data[i]) << (16 * i)
 				}
 				return int64(result)
@@ -58,7 +63,8 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 				return fmt.Sprintf("%d", value)
 			},
 		},
-		quantity,
+		width,
+		uint16(length),
 	}
 
 }
@@ -76,30 +82,40 @@ type mappers struct {
 type integerRegister struct {
 	register
 	mappers
-	quantity uint16
+	width  uint16
+	length uint16
 }
 
 type integerValue struct {
 	mappers
-	data []uint16
+	slicedData [][]uint16
 }
 
 func (value integerValue) AsString() string {
-	return value.mapToString(value.asInt64())
+	if len(value.slicedData) != 1 {
+		panic("cannot handle sliced data as string")
+	}
+	return value.mapToString(value.mapToInt64(value.slicedData[0]))
 }
 
-func (value integerValue) AsFloat64() float64 {
-	return value.mapToFloat64(value.asInt64())
-}
-
-func (value integerValue) asInt64() int64 {
-	return value.mapToInt64(value.data)
+func (value integerValue) AsFloat64s() []float64 {
+	result := make([]float64, len(value.slicedData))
+	for i := 0; i < len(result); i++ {
+		result[i] = value.mapToFloat64(value.mapToInt64(value.slicedData[i]))
+	}
+	return result
 }
 
 func (register integerRegister) ReadWith(reader Reader) (Value, error) {
-	data, err := reader(register.address, register.quantity)
+	quantity := register.width * register.length
+	log.Infof("Reading %d from address %d", quantity, register.address)
+	data, err := reader(register.address, quantity)
 	if err != nil {
 		return nil, err
 	}
-	return &integerValue{register.mappers, data}, nil
+	slicedData := make([][]uint16, register.length)
+	for i := uint16(0); i < register.length; i++ {
+		slicedData[i] = data[register.width*i : register.width*(i+1)]
+	}
+	return &integerValue{register.mappers, slicedData}, nil
 }

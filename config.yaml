@@ -119,3 +119,39 @@ metrics:
         address: 5036
         mapValue:
           x: x/10
+
+  - name: pv_power_today_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6100
+        length: 96
+  - name: pv_yields_daily_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6196
+        length: 32
+        mapValue:
+          x: x/10
+  - name: pv_yields_monthly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6227
+        length: 12
+        mapValue:
+          x: x/10
+  - name: pv_yields_yearly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u32
+        address: 6250
+        length: 20
+        mapValue:
+          x: "x == 4294967295 ? 0 : x/10"
+
