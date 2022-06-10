@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
 	configPkg "sungrow-prometheus-exporter/config"
@@ -28,11 +29,13 @@ func main() {
 		registerPrometheusMetric(reader, metricConfig)
 	}
 
+	log.Infof("Serving metrics...")
 	http.Handle("/metrics", promhttp.Handler())
 	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
 		panic(err.Error())
 	}
+	log.Infof("Done")
 }
 
 func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Metric) {
@@ -40,26 +43,28 @@ func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Me
 	for _, labelConfig := range metricConfig.Labels {
 		labels[labelConfig.Name] = readStringValue(reader, labelConfig.Value)
 	}
-	valueFunc := buildPrometheusValueFunc(reader, metricConfig.Value)
-	if metricConfig.Type == configPkg.Counter {
-		promauto.NewCounterFunc(prometheus.CounterOpts{
+	buildPrometheusValueFunc(reader, metricConfig.Value, func(idxValue string, valueFunc func() float64) {
+		if len(idxValue) > 0 {
+			labels["idx"] = idxValue
+		}
+		opts := prometheus.Opts{
+			Namespace:   "sungrow",
 			Name:        metricConfig.Name,
 			Help:        metricConfig.Help,
 			ConstLabels: labels,
-		}, valueFunc)
-	}
-	if metricConfig.Type == configPkg.Gauge {
-		promauto.NewGaugeFunc(prometheus.GaugeOpts{
-			Name:        metricConfig.Name,
-			Help:        metricConfig.Help,
-			ConstLabels: labels,
-		}, valueFunc)
-	}
+		}
+		if metricConfig.Type == configPkg.Counter {
+			promauto.NewCounterFunc(prometheus.CounterOpts(opts), valueFunc)
+		}
+		if metricConfig.Type == configPkg.Gauge {
+			promauto.NewGaugeFunc(prometheus.GaugeOpts(opts), valueFunc)
+		}
+	})
 }
 
 func readStringValue(reader register.Reader, valueConfig *configPkg.Value) string {
 	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
-		value, err := register.NewFromConfig(registerConfig).ReadWith(reader)
+		value, err := register.NewFromConfig(registerConfig).ReadWith(reader, 0)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -75,14 +80,27 @@ func readStringValue(reader register.Reader, valueConfig *configPkg.Value) strin
 	panic("cannot read register value for metric")
 }
 
-func buildPrometheusValueFunc(reader register.Reader, valueConfig *configPkg.Value) func() float64 {
+func buildPrometheusValueFunc(reader register.Reader, valueConfig *configPkg.Value, consumer func(idxValue string, valueFunc func() float64)) {
 	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
-		return func() float64 {
-			value, err := register.NewFromConfig(registerConfig).ReadWith(reader)
+		indexedValueFunc := func(i uint16) float64 {
+			value, err := register.NewFromConfig(registerConfig).ReadWith(reader, i)
 			if err != nil {
+				log.Warnf("Cannot read register: %s", err.Error())
 				return math.NaN()
 			}
-			return value.AsFloat64s()[0]
+			return value.AsFloat64()
+		}
+		if registerConfig.Length > 1 {
+			for i := uint16(0); i < registerConfig.Length; i++ {
+				idx := i
+				consumer(fmt.Sprintf("%02d", i), func() float64 {
+					return indexedValueFunc(idx)
+				})
+			}
+		} else {
+			consumer("", func() float64 {
+				return indexedValueFunc(0)
+			})
 		}
 	}
 	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
@@ -90,9 +108,8 @@ func buildPrometheusValueFunc(reader register.Reader, valueConfig *configPkg.Val
 		if err != nil {
 			panic(err.Error())
 		}
-		return func() float64 {
+		consumer("", func() float64 {
 			return value.(float64)
-		}
+		})
 	}
-	panic("cannot get value func for metric")
 }

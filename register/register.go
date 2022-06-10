@@ -11,12 +11,12 @@ type Reader interface {
 }
 
 type Register interface {
-	ReadWith(reader Reader) (Value, error)
+	ReadWith(reader Reader, index uint16) (Value, error)
 }
 
 type Value interface {
 	fmt.Stringer
-	AsFloat64s() []float64
+	AsFloat64() float64
 }
 
 func NewFromConfig(registerConfig *config.Register) Register {
@@ -38,7 +38,6 @@ func NewFromConfig(registerConfig *config.Register) Register {
 func newStringRegister(registerConfig *config.Register) *stringRegister {
 	return &stringRegister{register{
 		registerConfig.Address,
-		1,
 		registerConfig.Length,
 	}}
 }
@@ -64,12 +63,12 @@ func (s stringValue) String() string {
 	return string(result)
 }
 
-func (s stringValue) AsFloat64s() []float64 {
+func (s stringValue) AsFloat64() float64 {
 	panic("string value does not have float64 representation")
 }
 
-func (r stringRegister) ReadWith(reader Reader) (Value, error) {
-	data, err := reader.Read(r.address, r.width*r.length)
+func (r stringRegister) ReadWith(reader Reader, index uint16) (Value, error) {
+	data, err := reader.Read(r.address, r.width)
 	if err != nil {
 		return nil, err
 	}
@@ -78,15 +77,10 @@ func (r stringRegister) ReadWith(reader Reader) (Value, error) {
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
 	width := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
-	length := uint16(1)
-	if registerConfig.Length > 1 {
-		length = registerConfig.Length
-	}
 	return &integerRegister{
 		register{
 			registerConfig.Address,
 			width,
-			length,
 		},
 		mappers{
 			mapToInt64: func(data []uint16) int64 {
@@ -118,7 +112,6 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 type register struct {
 	address uint16
 	width   uint16
-	length  uint16
 }
 
 type mappers struct {
@@ -134,32 +127,21 @@ type integerRegister struct {
 
 type integerValue struct {
 	mappers
-	slicedData [][]uint16
+	data []uint16
 }
 
 func (v integerValue) String() string {
-	if len(v.slicedData) != 1 {
-		panic("cannot handle sliced data as string")
-	}
-	return v.mapToString(v.mapToInt64(v.slicedData[0]))
+	return v.mapToString(v.mapToInt64(v.data))
 }
 
-func (v integerValue) AsFloat64s() []float64 {
-	result := make([]float64, len(v.slicedData))
-	for i := 0; i < len(result); i++ {
-		result[i] = v.mapToFloat64(v.mapToInt64(v.slicedData[i]))
-	}
-	return result
+func (v integerValue) AsFloat64() float64 {
+	return v.mapToFloat64(v.mapToInt64(v.data))
 }
 
-func (r integerRegister) ReadWith(reader Reader) (Value, error) {
-	data, err := reader.Read(r.address, r.width*r.length)
+func (r integerRegister) ReadWith(reader Reader, index uint16) (Value, error) {
+	data, err := reader.Read(r.address+index*r.width, r.width)
 	if err != nil {
 		return nil, err
 	}
-	slicedData := make([][]uint16, r.length)
-	for i := uint16(0); i < r.length; i++ {
-		slicedData[i] = data[r.width*i : r.width*(i+1)]
-	}
-	return &integerValue{r.mappers, slicedData}, nil
+	return &integerValue{r.mappers, data}, nil
 }
