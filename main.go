@@ -1,20 +1,15 @@
 package main
 
 import (
-	"github.com/goburrow/modbus"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	log "github.com/sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"math"
+	"net/http"
 	configPkg "sungrow-prometheus-exporter/config"
+	"sungrow-prometheus-exporter/modbus"
 	"sungrow-prometheus-exporter/register"
-	"time"
-)
-
-var (
-	opsProcessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "myapp_processed_ops_total",
-		Help: "The total number of processed events",
-	})
 )
 
 func main() {
@@ -23,47 +18,81 @@ func main() {
 		panic(err.Error())
 	}
 
-	handler := modbus.NewTCPClientHandler(config.Inverter.Address)
-	handler.Timeout = 3 * time.Second
-	handler.SlaveId = 0x1
-	// Connect manually so that multiple requests are handled in one connection session
-	err = handler.Connect()
+	reader, err := modbus.NewReader(config.Inverter.Address)
 	if err != nil {
 		panic(err.Error())
 	}
-	defer func(handler *modbus.TCPClientHandler) {
-		err := handler.Close()
+	defer reader.Close()
+
+	for _, metricConfig := range config.Metrics {
+		registerPrometheusMetric(reader, metricConfig)
+	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	err = http.ListenAndServe(":8080", nil)
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Metric) {
+	labels := prometheus.Labels{}
+	for _, labelConfig := range metricConfig.Labels {
+		labels[labelConfig.Name] = readStringValue(reader, labelConfig.Value)
+	}
+	valueFunc := buildPrometheusValueFunc(reader, metricConfig.Value)
+	if metricConfig.Type == configPkg.Counter {
+		promauto.NewCounterFunc(prometheus.CounterOpts{
+			Name:        metricConfig.Name,
+			Help:        metricConfig.Help,
+			ConstLabels: labels,
+		}, valueFunc)
+	}
+	if metricConfig.Type == configPkg.Gauge {
+		promauto.NewGaugeFunc(prometheus.GaugeOpts{
+			Name:        metricConfig.Name,
+			Help:        metricConfig.Help,
+			ConstLabels: labels,
+		}, valueFunc)
+	}
+}
+
+func readStringValue(reader register.Reader, valueConfig *configPkg.Value) string {
+	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
+		value, err := register.NewFromConfig(registerConfig).ReadWith(reader)
 		if err != nil {
 			panic(err.Error())
 		}
-	}(handler)
-
-	client := modbus.NewClient(handler)
-
-	for _, metric := range config.Metrics {
-		if registerConfig := metric.Value.FromRegister; registerConfig != nil {
-			value, err := register.NewFromConfig(registerConfig).ReadWith(func(address, quantity uint16) ([]uint16, error) {
-				bytes, err := client.ReadInputRegisters(address-1, quantity)
-				if err != nil {
-					return nil, err
-				}
-				return convertBytesToUInt16(bytes), nil
-			})
-			if err != nil {
-				panic(err.Error())
-			}
-			log.Infof("%s=%v", metric.Name, value.AsFloat64s())
-		}
-
+		return value.String()
 	}
-
+	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
+		value, err := expressionConfig.Evaluate(map[string]interface{}{})
+		if err != nil {
+			panic(err.Error())
+		}
+		return fmt.Sprintf("%v", value)
+	}
+	panic("cannot read register value for metric")
 }
 
-func convertBytesToUInt16(bytes []byte) []uint16 {
-	size := len(bytes) / 2
-	result := make([]uint16, size)
-	for i := 0; i < size; i++ {
-		result[i] = uint16(bytes[2*i+1]) + uint16(bytes[2*i])<<8
+func buildPrometheusValueFunc(reader register.Reader, valueConfig *configPkg.Value) func() float64 {
+	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
+		return func() float64 {
+			value, err := register.NewFromConfig(registerConfig).ReadWith(reader)
+			if err != nil {
+				return math.NaN()
+			}
+			return value.AsFloat64s()[0]
+		}
 	}
-	return result
+	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
+		value, err := expressionConfig.Evaluate(map[string]interface{}{})
+		if err != nil {
+			panic(err.Error())
+		}
+		return func() float64 {
+			return value.(float64)
+		}
+	}
+	panic("cannot get value func for metric")
 }
