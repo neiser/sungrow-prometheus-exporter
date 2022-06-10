@@ -20,10 +20,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	reader, err := modbus.NewReader(config.Inverter.Address)
-	if err != nil {
-		panic(err.Error())
-	}
+	reader := modbus.NewReader(config.Inverter.Address)
 	defer reader.Close()
 
 	for _, metricConfig := range config.Metrics {
@@ -36,7 +33,6 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	log.Infof("Done")
 }
 
 func getConfigYamlFilename() string {

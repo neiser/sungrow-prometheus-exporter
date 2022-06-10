@@ -10,16 +10,13 @@ type RegisterReader struct {
 	client  modbus.Client
 }
 
-func NewReader(address string) (*RegisterReader, error) {
+func NewReader(address string) *RegisterReader {
 	handler := modbus.NewTCPClientHandler(address)
 	handler.Timeout = 3 * time.Second
+	handler.IdleTimeout = 5 * time.Second
 	handler.SlaveId = 0x1
-	err := handler.Connect()
-	if err != nil {
-		return nil, err
-	}
 	client := modbus.NewClient(handler)
-	return &RegisterReader{handler, client}, nil
+	return &RegisterReader{handler, client}
 }
 
 func (r *RegisterReader) Close() {
@@ -30,6 +27,10 @@ func (r *RegisterReader) Close() {
 }
 
 func (r *RegisterReader) Read(address, quantity uint16) ([]uint16, error) {
+	err := r.handler.Connect()
+	if err != nil {
+		return nil, err
+	}
 	bytes, err := r.client.ReadInputRegisters(address-1, quantity)
 	if err != nil {
 		return nil, err
