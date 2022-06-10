@@ -8,13 +8,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
+	"os"
 	configPkg "sungrow-prometheus-exporter/config"
 	"sungrow-prometheus-exporter/modbus"
 	"sungrow-prometheus-exporter/register"
 )
 
 func main() {
-	config, err := configPkg.ReadFromFile("config.yaml")
+	config, err := configPkg.ReadFromFile(getConfigYamlFilename())
 	if err != nil {
 		panic(err.Error())
 	}
@@ -36,6 +37,14 @@ func main() {
 		panic(err.Error())
 	}
 	log.Infof("Done")
+}
+
+func getConfigYamlFilename() string {
+	dir := "."
+	if koDataPath := os.Getenv("KO_DATA_PATH"); len(koDataPath) > 0 {
+		dir = koDataPath
+	}
+	return dir + "/config.yaml"
 }
 
 func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Metric) {
