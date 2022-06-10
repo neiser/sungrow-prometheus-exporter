@@ -73,11 +73,11 @@ func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Me
 
 func readStringValue(reader register.Reader, valueConfig *configPkg.Value) string {
 	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
-		value, err := register.NewFromConfig(registerConfig).ReadWith(reader, 0)
+		value, err := register.NewFromConfig(registerConfig).ReadString(reader)
 		if err != nil {
 			panic(err.Error())
 		}
-		return value.String()
+		return value
 	}
 	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
 		value, err := expressionConfig.Evaluate(map[string]interface{}{})
@@ -92,12 +92,12 @@ func readStringValue(reader register.Reader, valueConfig *configPkg.Value) strin
 func buildPrometheusValueFunc(reader register.Reader, valueConfig *configPkg.Value, consumer func(idxValue string, valueFunc func() float64)) {
 	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
 		indexedValueFunc := func(i uint16) float64 {
-			value, err := register.NewFromConfig(registerConfig).ReadWith(reader, i)
+			value, err := register.NewFromConfig(registerConfig).ReadFloat64(reader, i)
 			if err != nil {
 				log.Warnf("Cannot read register: %s", err.Error())
 				return math.NaN()
 			}
-			return value.AsFloat64()
+			return value
 		}
 		if registerConfig.Length > 1 {
 			for i := uint16(0); i < registerConfig.Length; i++ {

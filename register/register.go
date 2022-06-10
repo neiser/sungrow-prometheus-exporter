@@ -11,12 +11,8 @@ type Reader interface {
 }
 
 type Register interface {
-	ReadWith(reader Reader, index uint16) (Value, error)
-}
-
-type Value interface {
-	fmt.Stringer
-	AsFloat64() float64
+	ReadFloat64(reader Reader, index uint16) (float64, error)
+	ReadString(reader Reader) (string, error)
 }
 
 func NewFromConfig(registerConfig *config.Register) Register {
@@ -35,6 +31,26 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
+type register struct {
+	address uint16
+	width   uint16
+}
+
+type stringRegister struct {
+	register
+}
+
+type mappers struct {
+	mapToInt64   func(data []uint16) int64
+	mapToFloat64 func(value int64) float64
+	mapToString  func(value int64) string
+}
+
+type integerRegister struct {
+	register
+	mappers
+}
+
 func newStringRegister(registerConfig *config.Register) *stringRegister {
 	return &stringRegister{register{
 		registerConfig.Address,
@@ -42,37 +58,29 @@ func newStringRegister(registerConfig *config.Register) *stringRegister {
 	}}
 }
 
-type stringRegister struct {
-	register
+func (r *stringRegister) ReadFloat64(reader Reader, index uint16) (float64, error) {
+	panic("string register does not have float64 representation")
 }
 
-type stringValue struct {
-	data []uint16
+func (r *stringRegister) ReadString(reader Reader) (string, error) {
+	data, err := reader.Read(r.address, r.width)
+	if err != nil {
+		return "", err
+	}
+	return convertDataToString(data), nil
 }
 
-func (s stringValue) String() string {
+func convertDataToString(data []uint16) string {
 	var result []byte
-	for i := 0; i < len(s.data); i++ {
-		if b := byte(s.data[i] >> 8); b != 0 {
+	for i := 0; i < len(data); i++ {
+		if b := byte(data[i] >> 8); b != 0 {
 			result = append(result, b)
 		}
-		if b := byte(s.data[i] & 0xFF); b != 0 {
+		if b := byte(data[i] & 0xFF); b != 0 {
 			result = append(result, b)
 		}
 	}
 	return string(result)
-}
-
-func (s stringValue) AsFloat64() float64 {
-	panic("string value does not have float64 representation")
-}
-
-func (r stringRegister) ReadWith(reader Reader, index uint16) (Value, error) {
-	data, err := reader.Read(r.address, r.width)
-	if err != nil {
-		return nil, err
-	}
-	return &stringValue{data: data}, nil
 }
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
@@ -109,39 +117,18 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 
 }
 
-type register struct {
-	address uint16
-	width   uint16
+func (r *integerRegister) ReadString(reader Reader) (string, error) {
+	data, err := reader.Read(r.address, r.width)
+	if err != nil {
+		return "", err
+	}
+	return r.mapToString(r.mapToInt64(data)), nil
 }
 
-type mappers struct {
-	mapToInt64   func(data []uint16) int64
-	mapToFloat64 func(value int64) float64
-	mapToString  func(value int64) string
-}
-
-type integerRegister struct {
-	register
-	mappers
-}
-
-type integerValue struct {
-	mappers
-	data []uint16
-}
-
-func (v integerValue) String() string {
-	return v.mapToString(v.mapToInt64(v.data))
-}
-
-func (v integerValue) AsFloat64() float64 {
-	return v.mapToFloat64(v.mapToInt64(v.data))
-}
-
-func (r integerRegister) ReadWith(reader Reader, index uint16) (Value, error) {
+func (r *integerRegister) ReadFloat64(reader Reader, index uint16) (float64, error) {
 	data, err := reader.Read(r.address+index*r.width, r.width)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return &integerValue{r.mappers, data}, nil
+	return r.mapToFloat64(r.mapToInt64(data)), nil
 }
