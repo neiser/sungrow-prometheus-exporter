@@ -2,6 +2,7 @@ package register
 
 import (
 	"fmt"
+	"reflect"
 	"sungrow-prometheus-exporter/config"
 )
 
@@ -19,43 +20,28 @@ type Value interface {
 func NewFromConfig(registerConfig *config.Register) Register {
 	switch registerConfig.Type {
 	case config.U16RegisterType:
-		return newIntegerRegister(registerConfig, func(get getData) int64 {
-			return int64(get(0))
-		})
+		return newIntegerRegister[uint16](registerConfig)
 	case config.U32RegisterType:
-		return newIntegerRegister(registerConfig, func(get getData) int64 {
-			return int64(uint32(get(0)) + uint32(get(1))<<16)
-		})
+		return newIntegerRegister[uint32](registerConfig)
 	case config.S16RegisterType:
-		return newIntegerRegister(registerConfig, func(get getData) int64 {
-			return int64(int16(get(0)))
-		})
+		return newIntegerRegister[int16](registerConfig)
 	case config.S32RegisterType:
-		return newIntegerRegister(registerConfig, func(get getData) int64 {
-			return int64(int32(get(0)) + int32(get(1))<<16)
-		})
+		return newIntegerRegister[int32](registerConfig)
 	}
 	panic("unknown register type")
 }
 
-type getData func(i int) uint16
-
-func newIntegerRegister(registerConfig *config.Register, mapToInt64 func(data getData) int64) *integerRegister {
-	maxIndex := 0
-	mapToInt64(func(i int) uint16 {
-		if i > maxIndex {
-			maxIndex = i
-		}
-		return 0
-	})
-	quantity := uint16(maxIndex + 1)
+func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
+	quantity := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
 	return &integerRegister{
 		register{address: registerConfig.Address},
 		mapper{
 			mapToInt64: func(data []uint16) int64 {
-				return mapToInt64(func(i int) uint16 {
-					return data[i]
-				})
+				result := T(0)
+				for i := uint16(0); i < quantity; i++ {
+					result += T(data[i]) << (16 * i)
+				}
+				return int64(result)
 			},
 			mapToFloat64: func(value int64) float64 {
 				if functionMapper := registerConfig.MapValue.FunctionMapValue; functionMapper != nil {
