@@ -27,9 +27,11 @@ func main() {
 		registerPrometheusMetric(reader, metricConfig)
 	}
 
-	log.Infof("Serving metrics...")
-	http.Handle("/metrics", promhttp.Handler())
-	err = http.ListenAndServe(":8080", nil)
+	const path = "/metrics"
+	http.Handle(path, promhttp.Handler())
+	const addr = ":8080"
+	log.Infof("Serving at %s%s...", addr, path)
+	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		panic(err.Error())
 	}
