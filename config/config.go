@@ -33,6 +33,7 @@ type Inverter struct {
 type Metric struct {
 	Name   string     `yaml:"name"`
 	Help   string     `yaml:"help"`
+	Alias  string     `yaml:"alias"`
 	Type   MetricType `yaml:"type"`
 	Value  *Value     `yaml:"value"`
 	Labels []*Label   `yaml:"labels"`

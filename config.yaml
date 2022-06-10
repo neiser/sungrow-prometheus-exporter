@@ -45,6 +45,7 @@ metrics:
           x: 100*x
 
   - name: output_energy_total_watthours
+    alias: sunspec_WattHours_WH_Wh
     type: counter
     value:
       fromRegister:
@@ -55,6 +56,7 @@ metrics:
 
   - name: cabinet_temperature_celsius
     type: gauge
+    alias: sunspec_Cabinet_Temperature_TmpCab_C
     value:
       fromRegister:
         type: s16

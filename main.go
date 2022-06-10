@@ -47,17 +47,26 @@ func registerPrometheusMetric(reader register.Reader, metricConfig *configPkg.Me
 		if len(idxValue) > 0 {
 			labels["idx"] = idxValue
 		}
-		opts := prometheus.Opts{
+		opts := []prometheus.Opts{{
 			Namespace:   "sungrow",
 			Name:        metricConfig.Name,
 			Help:        metricConfig.Help,
 			ConstLabels: labels,
+		}}
+		if len(metricConfig.Alias) > 0 {
+			opts = append(opts, prometheus.Opts{
+				Name:        metricConfig.Alias,
+				Help:        metricConfig.Help,
+				ConstLabels: labels,
+			})
 		}
-		if metricConfig.Type == configPkg.Counter {
-			promauto.NewCounterFunc(prometheus.CounterOpts(opts), valueFunc)
-		}
-		if metricConfig.Type == configPkg.Gauge {
-			promauto.NewGaugeFunc(prometheus.GaugeOpts(opts), valueFunc)
+		for _, opt := range opts {
+			if metricConfig.Type == configPkg.Counter {
+				promauto.NewCounterFunc(prometheus.CounterOpts(opt), valueFunc)
+			}
+			if metricConfig.Type == configPkg.Gauge {
+				promauto.NewGaugeFunc(prometheus.GaugeOpts(opt), valueFunc)
+			}
 		}
 	})
 }
