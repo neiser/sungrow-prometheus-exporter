@@ -2,19 +2,20 @@ package register
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"reflect"
 	"sungrow-prometheus-exporter/config"
 )
 
-type Reader func(address, quantity uint16) ([]uint16, error)
+type Reader interface {
+	Read(address, quantity uint16) ([]uint16, error)
+}
 
 type Register interface {
 	ReadWith(reader Reader) (Value, error)
 }
 
 type Value interface {
-	AsString() string
+	fmt.Stringer
 	AsFloat64s() []float64
 }
 
@@ -28,18 +29,65 @@ func NewFromConfig(registerConfig *config.Register) Register {
 		return newIntegerRegister[int16](registerConfig)
 	case config.S32RegisterType:
 		return newIntegerRegister[int32](registerConfig)
+	case config.StringRegisterType:
+		return newStringRegister(registerConfig)
 	}
-	panic("unknown register type")
+	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
+}
+
+func newStringRegister(registerConfig *config.Register) *stringRegister {
+	return &stringRegister{register{
+		registerConfig.Address,
+		1,
+		registerConfig.Length,
+	}}
+}
+
+type stringRegister struct {
+	register
+}
+
+type stringValue struct {
+	data []uint16
+}
+
+func (s stringValue) String() string {
+	var result []byte
+	for i := 0; i < len(s.data); i++ {
+		if b := byte(s.data[i] >> 8); b != 0 {
+			result = append(result, b)
+		}
+		if b := byte(s.data[i] & 0xFF); b != 0 {
+			result = append(result, b)
+		}
+	}
+	return string(result)
+}
+
+func (s stringValue) AsFloat64s() []float64 {
+	panic("string value does not have float64 representation")
+}
+
+func (r stringRegister) ReadWith(reader Reader) (Value, error) {
+	data, err := reader.Read(r.address, r.width*r.length)
+	if err != nil {
+		return nil, err
+	}
+	return &stringValue{data: data}, nil
 }
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
 	width := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
-	length := 1
+	length := uint16(1)
 	if registerConfig.Length > 1 {
 		length = registerConfig.Length
 	}
 	return &integerRegister{
-		register{address: registerConfig.Address},
+		register{
+			registerConfig.Address,
+			width,
+			length,
+		},
 		mappers{
 			mapToInt64: func(data []uint16) int64 {
 				result := T(0)
@@ -63,14 +111,14 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 				return fmt.Sprintf("%d", value)
 			},
 		},
-		width,
-		uint16(length),
 	}
 
 }
 
 type register struct {
 	address uint16
+	width   uint16
+	length  uint16
 }
 
 type mappers struct {
@@ -82,8 +130,6 @@ type mappers struct {
 type integerRegister struct {
 	register
 	mappers
-	width  uint16
-	length uint16
 }
 
 type integerValue struct {
@@ -91,31 +137,29 @@ type integerValue struct {
 	slicedData [][]uint16
 }
 
-func (value integerValue) AsString() string {
-	if len(value.slicedData) != 1 {
+func (v integerValue) String() string {
+	if len(v.slicedData) != 1 {
 		panic("cannot handle sliced data as string")
 	}
-	return value.mapToString(value.mapToInt64(value.slicedData[0]))
+	return v.mapToString(v.mapToInt64(v.slicedData[0]))
 }
 
-func (value integerValue) AsFloat64s() []float64 {
-	result := make([]float64, len(value.slicedData))
+func (v integerValue) AsFloat64s() []float64 {
+	result := make([]float64, len(v.slicedData))
 	for i := 0; i < len(result); i++ {
-		result[i] = value.mapToFloat64(value.mapToInt64(value.slicedData[i]))
+		result[i] = v.mapToFloat64(v.mapToInt64(v.slicedData[i]))
 	}
 	return result
 }
 
-func (register integerRegister) ReadWith(reader Reader) (Value, error) {
-	quantity := register.width * register.length
-	log.Infof("Reading %d from address %d", quantity, register.address)
-	data, err := reader(register.address, quantity)
+func (r integerRegister) ReadWith(reader Reader) (Value, error) {
+	data, err := reader.Read(r.address, r.width*r.length)
 	if err != nil {
 		return nil, err
 	}
-	slicedData := make([][]uint16, register.length)
-	for i := uint16(0); i < register.length; i++ {
-		slicedData[i] = data[register.width*i : register.width*(i+1)]
+	slicedData := make([][]uint16, r.length)
+	for i := uint16(0); i < r.length; i++ {
+		slicedData[i] = data[r.width*i : r.width*(i+1)]
 	}
-	return &integerValue{register.mappers, slicedData}, nil
+	return &integerValue{r.mappers, slicedData}, nil
 }

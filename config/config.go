@@ -34,13 +34,13 @@ type Metric struct {
 	Name   string     `yaml:"name"`
 	Help   string     `yaml:"help"`
 	Type   MetricType `yaml:"type"`
-	Value  Value      `yaml:"value"`
+	Value  *Value     `yaml:"value"`
 	Labels []*Label   `yaml:"labels"`
 }
 
 type Label struct {
 	Name  string `yaml:"name"`
-	Value Value  `yaml:"value"`
+	Value *Value `yaml:"value"`
 }
 
 type Value struct {
@@ -69,8 +69,7 @@ type ExpressionValue struct {
 type Register struct {
 	Type     RegisterType `yaml:"type"`
 	Address  uint16       `yaml:"address"`
-	Length   int          `yaml:"length"`
-	Interval string       `yaml:"interval"`
+	Length   uint16       `yaml:"length"`
 	MapValue MapValue     `yaml:"mapValue"`
 }
 
