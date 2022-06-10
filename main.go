@@ -41,8 +41,8 @@ func main() {
 	client := modbus.NewClient(handler)
 
 	for _, metric := range config.Metrics {
-		if registerValue, ok := metric.Value().(*configPkg.RegisterValue); ok {
-			value, err := register.New(registerValue).ReadWith(func(address, quantity uint16) ([]byte, error) {
+		if registerConfig := metric.Value.FromRegister; registerConfig != nil {
+			value, err := register.NewFromConfig(registerConfig).ReadWith(func(address, quantity uint16) ([]byte, error) {
 				return client.ReadInputRegisters(address-1, quantity)
 			})
 			if err != nil {

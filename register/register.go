@@ -2,7 +2,7 @@ package register
 
 import (
 	"fmt"
-	configPkg "sungrow-prometheus-exporter/config"
+	"sungrow-prometheus-exporter/config"
 )
 
 type Reader func(address, quantity uint16) ([]byte, error)
@@ -16,14 +16,14 @@ type Value interface {
 	AsFloat64() float64
 }
 
-func New(config *configPkg.RegisterValue) Register {
-	switch config.Type {
-	case configPkg.U16RegisterType:
-		return newIntegerRegister(config, func(get getByte) int64 {
+func NewFromConfig(registerConfig *config.Register) Register {
+	switch registerConfig.Type {
+	case config.U16RegisterType:
+		return newIntegerRegister(registerConfig, func(get getByte) int64 {
 			return int64(twoBytesAsInt[uint16](0, get))
 		})
-	case configPkg.U32RegisterType:
-		return newIntegerRegister(config, func(get getByte) int64 {
+	case config.U32RegisterType:
+		return newIntegerRegister(registerConfig, func(get getByte) int64 {
 			return int64(twoBytesAsInt[uint32](0, get) + twoBytesAsInt[uint32](2, get)<<16)
 		})
 	}
@@ -36,7 +36,7 @@ func twoBytesAsInt[T uint16 | uint32](offset int, get getByte) T {
 	return T(get(offset+1)) + T(get(offset+0))<<8
 }
 
-func newIntegerRegister(config *configPkg.RegisterValue, mapToInt64 func(bytes getByte) int64) *integerRegister {
+func newIntegerRegister(registerConfig *config.Register, mapToInt64 func(bytes getByte) int64) *integerRegister {
 	maxIndex := 0
 	mapToInt64(func(i int) byte {
 		if i > maxIndex {
@@ -46,7 +46,7 @@ func newIntegerRegister(config *configPkg.RegisterValue, mapToInt64 func(bytes g
 	})
 	quantity := uint16(maxIndex+1) / 2
 	return &integerRegister{
-		register{address: config.Address},
+		register{address: registerConfig.Address},
 		mapper{
 			mapToInt64: func(bytes []byte) int64 {
 				return mapToInt64(func(i int) byte {
@@ -54,13 +54,13 @@ func newIntegerRegister(config *configPkg.RegisterValue, mapToInt64 func(bytes g
 				})
 			},
 			mapToFloat64: func(value int64) float64 {
-				if functionMapper, ok := config.MapValue().(*configPkg.FunctionMapValue); ok {
+				if functionMapper := registerConfig.MapValue.FunctionMapValue; functionMapper != nil {
 					return functionMapper.Map(value)
 				}
 				return float64(value)
 			},
 			mapToString: func(value int64) string {
-				if enumMapper, ok := config.MapValue().(*configPkg.EnumMapValue); ok {
+				if enumMapper := registerConfig.MapValue.EnumMapValue; enumMapper != nil {
 					return enumMapper.Map(value)
 				}
 				return fmt.Sprintf("%d", value)

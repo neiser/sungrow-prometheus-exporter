@@ -1,11 +1,12 @@
 package config
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"gopkg.in/Knetic/govaluate.v3"
 	"gopkg.in/yaml.v3"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func ReadFromFile(filename string) (*Config, error) {
@@ -31,77 +32,53 @@ type Inverter struct {
 }
 
 type Metric struct {
-	Name   string      `yaml:"name"`
-	Help   string      `yaml:"help"`
-	Type   MetricType  `yaml:"type"`
-	Value  ValueGetter `yaml:"value"`
-	Labels []*Label
+	Name   string     `yaml:"name"`
+	Help   string     `yaml:"help"`
+	Type   MetricType `yaml:"type"`
+	Value  Value      `yaml:"value"`
+	Labels []*Label   `yaml:"labels"`
 }
 
 type Label struct {
-	Name  string      `yaml:"name"`
-	Value ValueGetter `yaml:"value"`
+	Name  string `yaml:"name"`
+	Value Value  `yaml:"value"`
 }
 
-type Value interface {
+type Value struct {
+	FromExpression *ExpressionValue `yaml:"fromExpression"`
+	FromRegister   *Register        `yaml:"fromRegister"`
 }
 
-type ValueGetter func() Value
-
-func (getter *ValueGetter) UnmarshalYAML(node *yaml.Node) error {
-	var m map[ValueType]interface{}
-	err := node.Decode(&m)
+func (expressionValue *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
+	s := ""
+	err := node.Decode(&s)
 	if err != nil {
 		return err
 	}
-	if len(m) != 1 {
-		return &yaml.TypeError{Errors: []string{"expected exactly one key"}}
+	expression, err := govaluate.NewEvaluableExpression(s)
+	if err != nil {
+		return errors.Wrapf(err, "cannot parse '%s' as expression", s)
 	}
-	if value, ok := m[ExpressionValueType]; ok {
-		expression := fmt.Sprintf("%v", value)
-		evaluableExpression, err := govaluate.NewEvaluableExpression(expression)
-		if err != nil {
-			return errors.Wrapf(err, "cannot parse '%s'", expression)
-		}
-		*getter = func() Value {
-			return &ExpressionValue{Expression: evaluableExpression}
-		}
-		return nil
-	}
-	if value, ok := m[RegisterValueType]; ok {
-		registerValueBytes, err := yaml.Marshal(value)
-		if err != nil {
-			return err
-		}
-		registerValue := &RegisterValue{}
-		err = yaml.Unmarshal(registerValueBytes, registerValue)
-		if err != nil {
-			return err
-		}
-		*getter = func() Value {
-			return registerValue
-		}
-		return nil
-	}
-	return &yaml.TypeError{Errors: []string{"unknown value type"}}
+	*expressionValue = ExpressionValue{expression}
+	return nil
 }
 
 type ExpressionValue struct {
-	Expression *govaluate.EvaluableExpression
+	*govaluate.EvaluableExpression
 }
 
-type RegisterValue struct {
-	Type     RegisterType   `yaml:"type"`
-	Address  uint16         `yaml:"address"`
-	Length   int            `yaml:"length"`
-	Interval string         `yaml:"interval"`
-	MapValue MapValueGetter `yaml:"mapValue"`
+type Register struct {
+	Type     RegisterType `yaml:"type"`
+	Address  uint16       `yaml:"address"`
+	Length   int          `yaml:"length"`
+	Interval string       `yaml:"interval"`
+	MapValue MapValue     `yaml:"mapValue"`
 }
 
-type MapValue interface {
+type MapValue struct {
+	FunctionMapValue *FunctionMapValue
+	EnumMapValue     *EnumMapValue
 }
-
-type MapValueGetter func() MapValue
 
 type FunctionMapValue struct {
 	Map func(value int64) float64
@@ -111,7 +88,7 @@ type EnumMapValue struct {
 	Map func(value int64) string
 }
 
-func (getter *MapValueGetter) UnmarshalYAML(node *yaml.Node) error {
+func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
 	m := map[string]string{}
 	err := node.Decode(m)
 	if err != nil {
@@ -128,12 +105,10 @@ func (getter *MapValueGetter) UnmarshalYAML(node *yaml.Node) error {
 					if err != nil {
 						continue
 					}
-					*getter = func() MapValue {
-						return &FunctionMapValue{Map: func(value int64) float64 {
-							y, _ := expression.Evaluate(map[string]interface{}{x: value})
-							return y.(float64)
-						}}
-					}
+					mapValue.FunctionMapValue = &FunctionMapValue{Map: func(value int64) float64 {
+						y, _ := expression.Evaluate(map[string]interface{}{x: value})
+						return y.(float64)
+					}}
 					return nil
 				}
 			}
@@ -143,44 +118,40 @@ func (getter *MapValueGetter) UnmarshalYAML(node *yaml.Node) error {
 		{
 			enumMap := make(map[int64]string)
 			for x, y := range m {
-				intExpr, err := govaluate.NewEvaluableExpression(x)
+				intValue, err := parseInt(x)
 				if err != nil {
-					return errors.Wrapf(err, "cannot parse '%s' as integer expression", x)
+					return errors.Wrapf(err, "cannot parse '%s' as integer", x)
 				}
-				result, err := intExpr.Evaluate(map[string]interface{}{})
-				if err != nil {
-					return errors.Wrapf(err, "cannot eval '%s' as integer expression", x)
-				}
-				if floatValue, ok := result.(float64); ok {
-					intValue := int64(floatValue)
-					if _, contains := enumMap[intValue]; contains {
-						return &yaml.TypeError{Errors: []string{"duplicate key for enum map"}}
-					}
-					enumMap[intValue] = y
-				} else {
-					return &yaml.TypeError{Errors: []string{"expression did not eval to int value"}}
-				}
+				enumMap[intValue] = y
 			}
-			*getter = func() MapValue {
-				return &EnumMapValue{Map: func(value int64) string {
-					return enumMap[value]
-				}}
-			}
+			mapValue.EnumMapValue = &EnumMapValue{Map: func(value int64) string {
+				return enumMap[value]
+			}}
 			return nil
 		}
 	}
 }
 
+func parseInt(s string) (int64, error) {
+	base := 10
+	if strings.HasPrefix(s, "0x") {
+		s = s[2:]
+		base = 16
+
+	}
+	result, err := strconv.ParseInt(s, base, 64)
+	if err != nil {
+		return 0, err
+	}
+	return result, nil
+}
+
 type MetricType string
-type ValueType string
 type RegisterType string
 
 const (
 	Gauge   MetricType = "gauge"
 	Counter MetricType = "counter"
-
-	ExpressionValueType ValueType = "fromExpression"
-	RegisterValueType   ValueType = "fromRegister"
 
 	U16RegisterType    RegisterType = "u16"
 	U32RegisterType    RegisterType = "u32"
