@@ -5,7 +5,7 @@ import (
 	"sungrow-prometheus-exporter/config"
 )
 
-type Reader func(address, quantity uint16) ([]byte, error)
+type Reader func(address, quantity uint16) ([]uint16, error)
 
 type Register interface {
 	ReadWith(reader Reader) (Value, error)
@@ -19,38 +19,34 @@ type Value interface {
 func NewFromConfig(registerConfig *config.Register) Register {
 	switch registerConfig.Type {
 	case config.U16RegisterType:
-		return newIntegerRegister(registerConfig, func(get getByte) int64 {
-			return int64(twoBytesAsInt[uint16](0, get))
+		return newIntegerRegister(registerConfig, func(get getData) int64 {
+			return int64(get(0))
 		})
 	case config.U32RegisterType:
-		return newIntegerRegister(registerConfig, func(get getByte) int64 {
-			return int64(twoBytesAsInt[uint32](0, get) + twoBytesAsInt[uint32](2, get)<<16)
+		return newIntegerRegister(registerConfig, func(get getData) int64 {
+			return int64(uint32(get(0)) + uint32(get(1))<<16)
 		})
 	}
 	panic("unknown register type")
 }
 
-type getByte func(i int) byte
+type getData func(i int) uint16
 
-func twoBytesAsInt[T uint16 | uint32](offset int, get getByte) T {
-	return T(get(offset+1)) + T(get(offset+0))<<8
-}
-
-func newIntegerRegister(registerConfig *config.Register, mapToInt64 func(bytes getByte) int64) *integerRegister {
+func newIntegerRegister(registerConfig *config.Register, mapToInt64 func(data getData) int64) *integerRegister {
 	maxIndex := 0
-	mapToInt64(func(i int) byte {
+	mapToInt64(func(i int) uint16 {
 		if i > maxIndex {
 			maxIndex = i
 		}
 		return 0
 	})
-	quantity := uint16(maxIndex+1) / 2
+	quantity := uint16(maxIndex + 1)
 	return &integerRegister{
 		register{address: registerConfig.Address},
 		mapper{
-			mapToInt64: func(bytes []byte) int64 {
-				return mapToInt64(func(i int) byte {
-					return bytes[i]
+			mapToInt64: func(data []uint16) int64 {
+				return mapToInt64(func(i int) uint16 {
+					return data[i]
 				})
 			},
 			mapToFloat64: func(value int64) float64 {
@@ -76,7 +72,7 @@ type register struct {
 }
 
 type mapper struct {
-	mapToInt64   func(bytes []byte) int64
+	mapToInt64   func(data []uint16) int64
 	mapToFloat64 func(value int64) float64
 	mapToString  func(value int64) string
 }
@@ -89,7 +85,7 @@ type integerRegister struct {
 
 type integerValue struct {
 	mapper
-	bytes []byte
+	data []uint16
 }
 
 func (value integerValue) AsString() string {
@@ -101,13 +97,13 @@ func (value integerValue) AsFloat64() float64 {
 }
 
 func (value integerValue) asInt64() int64 {
-	return value.mapToInt64(value.bytes)
+	return value.mapToInt64(value.data)
 }
 
 func (register integerRegister) ReadWith(reader Reader) (Value, error) {
-	bytes, err := reader(register.address, register.quantity)
+	data, err := reader(register.address, register.quantity)
 	if err != nil {
 		return nil, err
 	}
-	return &integerValue{register.mapper, bytes}, nil
+	return &integerValue{register.mapper, data}, nil
 }

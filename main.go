@@ -42,8 +42,12 @@ func main() {
 
 	for _, metric := range config.Metrics {
 		if registerConfig := metric.Value.FromRegister; registerConfig != nil {
-			value, err := register.NewFromConfig(registerConfig).ReadWith(func(address, quantity uint16) ([]byte, error) {
-				return client.ReadInputRegisters(address-1, quantity)
+			value, err := register.NewFromConfig(registerConfig).ReadWith(func(address, quantity uint16) ([]uint16, error) {
+				bytes, err := client.ReadInputRegisters(address-1, quantity)
+				if err != nil {
+					return nil, err
+				}
+				return convertBytesToUInt16(bytes), nil
 			})
 			if err != nil {
 				panic(err.Error())
@@ -53,4 +57,13 @@ func main() {
 
 	}
 
+}
+
+func convertBytesToUInt16(bytes []byte) []uint16 {
+	size := len(bytes) / 2
+	result := make([]uint16, size)
+	for i := 0; i < size; i++ {
+		result[i] = uint16(bytes[2*i+1]) + uint16(bytes[2*i])<<8
+	}
+	return result
 }
