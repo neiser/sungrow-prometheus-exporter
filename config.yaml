@@ -35,23 +35,32 @@ metrics:
             address: 4969
             length: 15
 
-  - name: output_energy_daily
+  - name: output_energy_daily_watthours
     type: counter
     value:
       fromRegister:
         type: u16
         address: 5003
         mapValue:
-          x: x/10.0
+          x: 100*x
 
-  - name: output_energy_total
+  - name: output_energy_total_watthours
     type: counter
     value:
       fromRegister:
         type: u32
         address: 5004
         mapValue:
-          x: x/10.0
+          x: 100*x
+
+  - name: cabinet_temperature_celsius
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 5008
+        mapValue:
+          x: x/10
 
   - name: mppt1_voltage_volts
     type: gauge
@@ -60,7 +69,7 @@ metrics:
         type: u16
         address: 5011
         mapValue:
-          x: x/10.0
+          x: x/10
   - name: mppt1_current_amperes
     type: gauge
     value:
@@ -68,7 +77,7 @@ metrics:
         type: u16
         address: 5012
         mapValue:
-          x: x/10.0
+          x: x/10
   - name: mppt2_voltage_volts
     type: gauge
     value:
@@ -76,7 +85,7 @@ metrics:
         type: u16
         address: 5013
         mapValue:
-          x: x/10.0
+          x: x/10
   - name: mppt2_current_amperes
     type: gauge
     value:
@@ -84,4 +93,29 @@ metrics:
         type: u16
         address: 5014
         mapValue:
-          x: x/10.0
+          x: x/10
+
+  - name: reactive_power_vars
+    type: gauge
+    value:
+      fromRegister:
+        type: s32
+        address: 5033
+
+  - name: power_factor
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 5035
+        mapValue:
+          x: x/1000
+
+  - name: grid_frequency_hertzs
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5036
+        mapValue:
+          x: x/10

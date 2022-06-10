@@ -26,6 +26,14 @@ func NewFromConfig(registerConfig *config.Register) Register {
 		return newIntegerRegister(registerConfig, func(get getData) int64 {
 			return int64(uint32(get(0)) + uint32(get(1))<<16)
 		})
+	case config.S16RegisterType:
+		return newIntegerRegister(registerConfig, func(get getData) int64 {
+			return int64(int16(get(0)))
+		})
+	case config.S32RegisterType:
+		return newIntegerRegister(registerConfig, func(get getData) int64 {
+			return int64(int32(get(0)) + int32(get(1))<<16)
+		})
 	}
 	panic("unknown register type")
 }
