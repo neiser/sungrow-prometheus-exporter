@@ -5,6 +5,7 @@ import (
 	configPkg "sungrow-prometheus-exporter/config"
 	"sungrow-prometheus-exporter/modbus"
 	"sungrow-prometheus-exporter/prometheus"
+	"sungrow-prometheus-exporter/register"
 )
 
 func main() {
@@ -13,13 +14,14 @@ func main() {
 		panic(err.Error())
 	}
 
-	reader := modbus.NewReader(config.Inverter.Address)
+	addressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisters())
+	reader := modbus.NewReader(config.Inverter.Address, addressIntervals)
 	defer reader.Close()
 
 	for _, metricConfig := range config.Metrics {
-		prometheus.RegisterMetric(reader, metricConfig)
+		prometheus.RegisterMetric(reader.Read, metricConfig)
 	}
-	prometheus.ListenAndServe()
+	prometheus.ListenAndServe("/", 8080)
 }
 
 func getConfigYamlFilename() string {

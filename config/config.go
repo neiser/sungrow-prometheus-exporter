@@ -23,12 +23,14 @@ func ReadFromFile(filename string) (*Config, error) {
 
 type Config struct {
 	Inverter *Inverter
-	Metrics  []*Metric
+	Metrics  Metrics
 }
 
 type Inverter struct {
 	Address string `yaml:"address"`
 }
+
+type Metrics []*Metric
 
 type Metric struct {
 	Name   string     `yaml:"name"`
@@ -112,6 +114,16 @@ func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
 	default:
 		return node.Decode(&mapValue.ByEnumMap)
 	}
+}
+
+func (metrics Metrics) FindRegisters() []*Register {
+	var r []*Register
+	for _, metric := range metrics {
+		if registerConfig := metric.Value.FromRegister; registerConfig != nil {
+			r = append(r, registerConfig)
+		}
+	}
+	return r
 }
 
 type MetricType string

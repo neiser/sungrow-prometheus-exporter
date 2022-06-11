@@ -12,12 +12,13 @@ import (
 	"sungrow-prometheus-exporter/register"
 )
 
-func ListenAndServe() {
-	const path = "/"
+const namespace = "sungrow"
+
+func ListenAndServe(path string, port uint16) {
+	address := fmt.Sprintf(":%d", port)
+	log.Infof("Serving at %s%s...", address, path)
 	http.Handle(path, promhttp.Handler())
-	const addr = ":8080"
-	log.Infof("Serving at %s%s...", addr, path)
-	err := http.ListenAndServe(addr, nil)
+	err := http.ListenAndServe(address, nil)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -33,7 +34,7 @@ func RegisterMetric(reader register.Reader, metricConfig *config.Metric) {
 			labels["idx"] = idxValue
 		}
 		opts := []prometheus.Opts{{
-			Namespace:   "sungrow",
+			Namespace:   namespace,
 			Name:        metricConfig.Name,
 			Help:        metricConfig.Help,
 			ConstLabels: labels,

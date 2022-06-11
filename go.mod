@@ -7,6 +7,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/sirupsen/logrus v1.8.1
+	golang.org/x/exp v0.0.0-20220609121020-a51bd0440498
 	gopkg.in/Knetic/govaluate.v3 v3.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )

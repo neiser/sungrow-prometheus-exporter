@@ -135,7 +135,7 @@ metrics:
       fromRegister:
         type: u16
         address: 6196
-        length: 32
+        length: 31
         mapValue:
           x: x/10
   - name: pv_yields_monthly_kilowatthours

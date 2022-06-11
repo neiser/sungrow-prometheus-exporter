@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"reflect"
 	"sungrow-prometheus-exporter/config"
+	"sungrow-prometheus-exporter/util"
 )
 
-type Reader interface {
-	Read(address, quantity uint16) ([]uint16, error)
-}
+type Reader func(address, quantity uint16) ([]uint16, error)
 
 type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
 	ReadString(reader Reader) (string, error)
+	getAddressInterval() *util.Interval[uint16]
 }
 
 func NewFromConfig(registerConfig *config.Register) Register {
@@ -31,9 +31,17 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
+func FindAddressIntervals(registerConfigs []*config.Register) util.Intervals[uint16] {
+	var addressIntervals util.Intervals[uint16]
+	for _, registerConfig := range registerConfigs {
+		addressIntervals = append(addressIntervals, NewFromConfig(registerConfig).getAddressInterval())
+	}
+	return addressIntervals
+}
+
 type register struct {
-	address uint16
-	width   uint16
+	baseAddress uint16
+	width       uint16
 }
 
 type stringRegister struct {
@@ -49,6 +57,7 @@ type mappers struct {
 type integerRegister struct {
 	register
 	mappers
+	length uint16
 }
 
 func newStringRegister(registerConfig *config.Register) *stringRegister {
@@ -58,19 +67,23 @@ func newStringRegister(registerConfig *config.Register) *stringRegister {
 	}}
 }
 
-func (r *stringRegister) ReadFloat64(reader Reader, index uint16) (float64, error) {
+func (r *stringRegister) getAddressInterval() *util.Interval[uint16] {
+	panic("not implemented")
+}
+
+func (r *stringRegister) ReadFloat64(Reader, uint16) (float64, error) {
 	panic("string register does not have float64 representation")
 }
 
 func (r *stringRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader.Read(r.address, r.width)
+	data, err := reader(r.baseAddress, r.width)
 	if err != nil {
 		return "", err
 	}
-	return convertDataToString(data), nil
+	return mapToString(data), nil
 }
 
-func convertDataToString(data []uint16) string {
+func mapToString(data []uint16) string {
 	var result []byte
 	for i := 0; i < len(data); i++ {
 		if b := byte(data[i] >> 8); b != 0 {
@@ -84,16 +97,20 @@ func convertDataToString(data []uint16) string {
 }
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
-	width := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
+	quantity := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
+	length := uint16(1)
+	if registerConfig.Length > 1 {
+		length = registerConfig.Length
+	}
 	return &integerRegister{
 		register{
 			registerConfig.Address,
-			width,
+			quantity,
 		},
 		mappers{
 			mapToInt64: func(data []uint16) int64 {
 				result := T(0)
-				for i := uint16(0); i < width; i++ {
+				for i := uint16(0); i < quantity; i++ {
 					result += T(data[i]) << (16 * i)
 				}
 				return int64(result)
@@ -113,12 +130,16 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 				return fmt.Sprintf("%d", value)
 			},
 		},
+		length,
 	}
+}
 
+func (r *integerRegister) getAddressInterval() *util.Interval[uint16] {
+	return &util.Interval[uint16]{r.baseAddress, r.baseAddress + (r.length-1)*r.width + (r.width - 1)}
 }
 
 func (r *integerRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader.Read(r.address, r.width)
+	data, err := reader(r.baseAddress, r.width)
 	if err != nil {
 		return "", err
 	}
@@ -126,7 +147,10 @@ func (r *integerRegister) ReadString(reader Reader) (string, error) {
 }
 
 func (r *integerRegister) ReadFloat64(reader Reader, index uint16) (float64, error) {
-	data, err := reader.Read(r.address+index*r.width, r.width)
+	if index >= r.length {
+		panic("register index out of range")
+	}
+	data, err := reader(r.baseAddress+index*r.width, r.width)
 	if err != nil {
 		return 0, err
 	}
