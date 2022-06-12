@@ -2,8 +2,8 @@ package cache
 
 import (
 	log "github.com/sirupsen/logrus"
-	"sungrow-prometheus-exporter/register"
-	"sungrow-prometheus-exporter/util"
+	"sungrow-prometheus-exporter/src/register"
+	"sungrow-prometheus-exporter/src/util"
 	"sync"
 	"time"
 )

@@ -2,8 +2,8 @@ package modbus
 
 import (
 	"github.com/goburrow/modbus"
-	"sungrow-prometheus-exporter/modbus/cache"
-	"sungrow-prometheus-exporter/util"
+	"sungrow-prometheus-exporter/src/modbus/cache"
+	"sungrow-prometheus-exporter/src/util"
 	"time"
 )
 

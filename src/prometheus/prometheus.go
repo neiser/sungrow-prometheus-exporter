@@ -8,8 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"math"
 	"net/http"
-	"sungrow-prometheus-exporter/config"
-	"sungrow-prometheus-exporter/register"
+	"sungrow-prometheus-exporter/src/config"
+	"sungrow-prometheus-exporter/src/register"
 )
 
 const namespace = "sungrow"

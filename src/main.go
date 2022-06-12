@@ -2,10 +2,10 @@ package main
 
 import (
 	"os"
-	configPkg "sungrow-prometheus-exporter/config"
-	"sungrow-prometheus-exporter/modbus"
-	"sungrow-prometheus-exporter/prometheus"
-	"sungrow-prometheus-exporter/register"
+	configPkg "sungrow-prometheus-exporter/src/config"
+	"sungrow-prometheus-exporter/src/modbus"
+	"sungrow-prometheus-exporter/src/prometheus"
+	"sungrow-prometheus-exporter/src/register"
 )
 
 func main() {

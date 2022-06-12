@@ -3,8 +3,8 @@ package register
 import (
 	"fmt"
 	"reflect"
-	"sungrow-prometheus-exporter/config"
-	"sungrow-prometheus-exporter/util"
+	"sungrow-prometheus-exporter/src/config"
+	"sungrow-prometheus-exporter/src/util"
 )
 
 type Reader func(address, quantity uint16) ([]uint16, error)
