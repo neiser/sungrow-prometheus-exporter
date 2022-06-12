@@ -100,7 +100,7 @@ metrics:
         mapValue:
           x: 100*x
 
-  - name: export_energy_daily_watthours
+  - name: export_energy_from_pv_daily_watthours
     type: counter
     value:
       fromRegister:
@@ -109,12 +109,48 @@ metrics:
         mapValue:
           x: 100*x
 
-  - name: export_energy_total_watthours
+  - name: export_energy_from_pv_total_watthours
     type: counter
     value:
       fromRegister:
         type: u32
         address: 13006
+        mapValue:
+          x: 100*x
+
+  - name: import_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13036
+        mapValue:
+          x: 100*x
+
+  - name: import_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13037
+        mapValue:
+          x: 100*x
+
+  - name: export_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13045
+        mapValue:
+          x: 100*x
+
+  - name: export_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13046
         mapValue:
           x: 100*x
 
@@ -136,6 +172,24 @@ metrics:
         mapValue:
           x: 100*x
 
+  - name: charge_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13040
+        mapValue:
+          x: 100*x
+
+  - name: charge_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13041
+        mapValue:
+          x: 100*x
+
   - name: direct_energy_consumption_daily_watthours
     type: counter
     value:
@@ -151,6 +205,24 @@ metrics:
       fromRegister:
         type: u32
         address: 13018
+        mapValue:
+          x: 100*x
+
+  - name: battery_discharge_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13026
+        mapValue:
+          x: 100*x
+
+  - name: battery_discharge_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13027
         mapValue:
           x: 100*x
 
@@ -342,7 +414,7 @@ metrics:
         type: u16
         address: 6469
         length: 96
-  - name: batter_charge_power_today_watts
+  - name: battery_charge_power_today_watts
     type: gauge
     value:
       fromRegister:
@@ -474,6 +546,12 @@ metrics:
       fromRegister:
         type: u16
         address: 13001
+  - name: grid_state
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13030
 
   - name: load_power_watts
     type: gauge
@@ -481,11 +559,64 @@ metrics:
       fromRegister:
         type: s32
         address: 13008
-
   - name: export_power_watts
     type: gauge
     value:
       fromRegister:
         type: s32
         address: 13010
+  - name: total_active_power_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: s32
+        address: 13034
+  - name: self_consumption_ratio
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13029
+        mapValue:
+          x: x/1000
 
+  - name: battery_voltage_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13020
+        mapValue:
+          x: x/10
+  - name: battery_current_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13021
+        mapValue:
+          x: x/10
+  - name: battery_power_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13022
+        mapValue:
+          x: x/10
+  - name: battery_level_percents
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13023
+        mapValue:
+          x: x/10
+  - name: battery_temperature_celsius
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 13025
+        mapValue:
+          x: x/10
