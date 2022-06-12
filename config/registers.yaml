@@ -1,0 +1,589 @@
+- name: R001_protocol_number
+  type: u32
+  address: 4950
+
+- name: R002_protocol_version
+  type: u32
+  address: 4952
+
+- name: R003_arm_software_version
+  type: string
+  address: 4954
+  length: 15
+
+- name: R004_dsp_software_version
+  type: string
+  address: 4969
+  length: 15
+
+# R05: reserved
+
+- name: R006_serial_number
+  type: string
+  address: 4990
+  length: 10
+
+- name: R007_device_type_code
+  type: u16
+  address: 5000
+  mapValue:
+    0xe00: SH5.0RT
+    0xe01: SH6.0RT
+    0xe02: SH8.0RT
+    0xe03: SH10RT
+
+- name: R008_nominal_output_power
+  type: u16
+  address: 5001
+  unit: watt
+  mapValue:
+    x: 100*x
+
+- name: R009_output_type
+  type: u16
+  address: 5002
+  mapValue:
+    0: single
+    1: 3P4L
+    2: 3P3L
+
+- name: R010_daily_output_energy
+  type: u16
+  address: 5003
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R011_total_output_energy
+  type: u32
+  address: 5004
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+# R12: reserved
+
+- name: R013_inside_temperature
+  type: s16
+  address: 5008
+  unit: celsius
+  mapValue:
+    x: x/10
+
+# R14: reserved
+
+- name: R015_mppt1_voltage
+  type: u16
+  address: 5011
+  unit: volt
+  mapValue:
+    x: x/10
+
+- name: R016_mppt1_current
+  type: u16
+  address: 5012
+  unit: ampere
+  mapValue:
+    x: x/10
+
+- name: R017_mppt2_voltage
+  type: u16
+  address: 5013
+  unit: volt
+  mapValue:
+    x: x/10
+
+- name: R018_mppt2_current
+  type: u16
+  address: 5014
+  unit: ampere
+  mapValue:
+    x: x/10
+
+# R19: reserved
+
+- name: R020_total_dc_power
+  type: u32
+  address: 5017
+  unit: watt
+
+- name: R021_phase_a_voltage
+  type: u16
+  address: 5019
+  unit: volt
+  mapValue:
+    x: x/10
+
+- name: R022_phase_b_voltage
+  type: u16
+  address: 5020
+  unit: volt
+  mapValue:
+    x: x/10
+
+- name: R023_phase_c_voltage
+  type: u16
+  address: 5021
+  unit: volt
+  mapValue:
+    x: x/10
+
+# R24: reserved
+
+- name: R025_reactive_power
+  type: s32
+  address: 5033
+  unit: var # VA reactive = VA = Watt
+
+- name: R026_power_factor
+  type: s16
+  address: 5035
+  mapValue:
+    x: x/1000
+
+- name: R027_grid_frequency
+  type: u16
+  address: 5036
+  unit: hertz
+  mapValue:
+    x: x/10
+
+- name: R028_export_limit_min
+  type: u16
+  address: 5622
+  unit: watt
+  mapValue:
+    x: 10*x
+
+- name: R029_export_limit_max
+  type: u16
+  address: 5623
+  unit: watt
+  mapValue:
+    x: 10*x
+
+- name: R030_bdc_rated_power
+  type: u16
+  address: 5628
+  unit: watt
+  mapValue:
+    x: 100*x
+
+- name: R031_max_charging_current_bms
+  type: u16
+  address: 5635
+  unit: ampere
+
+- name: R032_max_discharging_current_bms
+  type: u16
+  address: 5636
+  unit: ampere
+
+- name: R033_pv_power_of_today
+  type: u16
+  address: 6100
+  length: 96
+  unit: watt
+
+- name: R034_daily_pv_yields
+  type: u16
+  address: 6196
+  length: 31
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R035_monthly_pv_yields
+  type: u16
+  address: 6227
+  length: 12
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+# R36: reserved
+
+- name: R037_yearly_pv_yields
+  type: u32
+  address: 6250
+  length: 20
+  unit: watthour
+  mapValue:
+    x: "x == 4294967295 ? 0 : 100*x"
+
+- name: R038_direct_power_consumption_of_today_from_pv
+  type: u16
+  address: 6290
+  length: 96
+  unit: watt
+
+- name: R039_daily_direct_energy_consumption_from_pv
+  type: u16
+  address: 6386
+  length: 31
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R040_monthly_direct_energy_consumption_from_pv
+  type: u16
+  address: 6417
+  length: 12
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R041_yearly_direct_energy_consumption_yearly
+  type: u32
+  address: 6429
+  length: 20
+  unit: watthour
+  mapValue:
+    x: "x == 4294967295 ? 0 : 100*x"
+
+- name: R042_export_power_from_pv_of_today
+  type: u16
+  address: 6469
+  length: 96
+
+- name: R043_daily_export_energy_from_pv
+  type: u16
+  address: 6565
+  length: 31
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R044_monthly_export_energy_from_pv
+  type: u16
+  address: 6596
+  length: 12
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R045_yearly_export_energy_from_pv
+  type: u32
+  address: 6608
+  length: 20
+  unit: watthour
+  mapValue:
+    x: "x == 4294967295 ? 0 : 100*x"
+
+- name: R046_battery_charge_power_of_today
+  type: u16
+  address: 6648
+  length: 96
+
+- name: R047_daily_battery_charge_energy_from_pv
+  type: u16
+  address: 6744
+  length: 31
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R048_monthly_battery_charge_energy_from_pv
+  type: u16
+  address: 6775
+  length: 12
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R049_yearly_battery_charge_energy_from_pv
+  type: u32
+  address: 6787
+  length: 20
+  unit: watthour
+  mapValue:
+    x: "x == 4294967295 ? 0 : 100*x"
+
+- name: R050_system_state
+  type: u16
+  address: 13000
+
+- name: R051_running_state
+  type: u16
+  address: 13001
+
+- name: R052_daily_pv_generation
+  type: u16
+  address: 13002
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R053_total_pv_generation
+  type: u32
+  address: 13003
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R054_daily_export_energy_from_pv # spec says power?
+  type: u16
+  address: 13005
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R055_total_export_energy_from_pv
+  type: u32
+  address: 13006
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R056_load_power
+  type: s32
+  address: 13008
+  unit: watt
+
+- name: R057_export_power
+  type: s32
+  address: 13010
+  unit: watt
+
+- name: R058_daily_battery_charge_energy_from_pv
+  type: u16
+  address: 13012
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R059_total_battery_charge_energy_from_pv
+  type: u32
+  address: 13013
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R060_co2_reduction
+  type: u32
+  address: 13015
+  unit: gram
+  mapValue:
+    x: 100*x
+
+- name: R061_daily_direct_energy_consumption
+  type: u16
+  address: 13017
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R062_total_direct_energy_consumption
+  type: u32
+  address: 13018
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R063_battery_voltage
+  type: u16
+  address: 13020
+  unit: volt
+  mapValue:
+    x: x/10
+
+- name: R064_battery_current
+  type: u16
+  address: 13021
+  unit: ampere
+  mapValue:
+    x: x/10
+
+- name: R065_battery_power
+  type: u16
+  address: 13022
+  unit: watt
+  mapValue:
+    x: x
+
+- name: R066_battery_level
+  type: u16
+  address: 13023
+  mapValue:
+    x: x/1000
+
+- name: R067_battery_state_of_healthy
+  type: u16
+  address: 13024
+  mapValue:
+    x: x/1000
+
+- name: R068_battery_temperature
+  type: s16
+  address: 13025
+  mapValue:
+    x: x/10
+
+- name: R069_daily_battery_discharge_energy
+  type: u16
+  address: 13026
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R070_total_battery_discharge_energy
+  type: u32
+  address: 13027
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R071_self_consumption_of_today
+  type: u16
+  address: 13029
+  mapValue:
+    x: x/1000
+
+- name: R072_grid_state
+  type: u16
+  address: 13030
+#    mapValue:
+#      0xAA: "off_grid"
+#      0x55: "on_grid"
+
+- name: R073_phase_a_current
+  type: s16
+  address: 13031
+  unit: ampere
+  mapValue:
+    x: x/10
+
+- name: R074_phase_b_current
+  type: s16
+  address: 13032
+  unit: ampere
+  mapValue:
+    x: x/10
+
+- name: R075_phase_c_current
+  type: s16
+  address: 13033
+  unit: ampere
+  mapValue:
+    x: x/10
+
+- name: R076_total_active_power
+  type: s32
+  address: 13034
+  unit: watt
+
+- name: R077_daily_import_energy
+  type: u16
+  address: 13036
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R078_total_import_energy
+  type: u32
+  address: 13037
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+# R79: not applicable
+
+- name: R080_charge_energy_daily
+  type: u16
+  address: 13040
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R081_total_charge_energy
+  type: u32
+  address: 13041
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R082_drm_state
+  type: u16
+  address: 13043
+
+# R83: reserved
+
+- name: R084_daily_export_energy
+  type: u16
+  address: 13045
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+- name: R085_total_export_energy
+  type: u32
+  address: 13046
+  unit: watthour
+  mapValue:
+    x: 100*x
+
+# R86: reserved
+
+- name: R087_inverter_alarm
+  type: u32
+  address: 13050
+
+- name: R088_grid_side_fault
+  type: u32
+  address: 13052
+
+- name: R089_system_fault_1
+  type: u32
+  address: 13054
+
+- name: R090_system_fault_2
+  type: u32
+  address: 13056
+
+- name: R091_dc_side_fault
+  type: u32
+  address: 13058
+
+- name: R092_permanent_fault
+  type: u32
+  address: 13060
+
+- name: R093_bdc_side_fault
+  type: u32
+  address: 13062
+
+- name: R094_bdc_side_permanent_fault
+  type: u32
+  address: 13064
+
+- name: R095_battery_fault
+  type: u32
+  address: 13066
+
+- name: R096_battery_alarm
+  type: u32
+  address: 13068
+
+- name: R097_bms_alarm_1 # there's also 2 below
+  type: u32
+  address: 13070
+
+- name: R098_bms_protection
+  type: u32
+  address: 13072
+
+- name: R099_bms_fault_1
+  type: u32
+  address: 13074
+
+- name: R100_bms_fault_2
+  type: u32
+  address: 13076
+
+- name: R088_bms_alarm_2
+  type: u32
+  address: 13078
+
+# R102: reserved
+
+# R103-R121: not applicable
