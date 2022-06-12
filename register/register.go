@@ -127,7 +127,10 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 						return mappedValue
 					}
 				}
-				return fmt.Sprintf("%d", value)
+				if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
+					return fmt.Sprintf("%v", mapper(value))
+				}
+				return fmt.Sprintf("%v", value)
 			},
 		},
 		length,
