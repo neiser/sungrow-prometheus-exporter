@@ -8,13 +8,15 @@ metrics:
     value:
       fromExpression: 1
     labels:
-      - name: type
+      - name: model
         value:
           fromRegister:
             type: u16
             address: 5000
             mapValue:
               0xe00: SH5.0RT
+              0xe01: SH6.0RT
+              0xe02: SH8.0RT
               0xe03: SH10RT
       - name: sn
         value:
@@ -34,6 +36,32 @@ metrics:
             type: string
             address: 4969
             length: 15
+      - name: protocol_no
+        value:
+          fromRegister:
+            type: u32
+            address: 4950
+      - name: protocol_ver
+        value:
+          fromRegister:
+            type: u32
+            address: 4952
+      - name: nominal_output_power_watts
+        value:
+          fromRegister:
+            type: u16
+            address: 5001
+            mapValue:
+              x: 100*x
+      - name: output_type
+        value:
+          fromRegister:
+            type: u16
+            address: 5002
+            mapValue:
+              0: single
+              1: 3P4L
+              2: 3P3L
 
   - name: output_energy_daily_watthours
     type: counter
@@ -51,6 +79,78 @@ metrics:
       fromRegister:
         type: u32
         address: 5004
+        mapValue:
+          x: 100*x
+
+  - name: pv_yield_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13002
+        mapValue:
+          x: 100*x
+
+  - name: pv_yield_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13003
+        mapValue:
+          x: 100*x
+
+  - name: export_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13005
+        mapValue:
+          x: 100*x
+
+  - name: export_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13006
+        mapValue:
+          x: 100*x
+
+  - name: battery_charge_energy_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13012
+        mapValue:
+          x: 100*x
+
+  - name: battery_charge_energy_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13013
+        mapValue:
+          x: 100*x
+
+  - name: direct_energy_consumption_daily_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u16
+        address: 13017
+        mapValue:
+          x: 100*x
+
+  - name: direct_energy_consumption_total_watthours
+    type: counter
+    value:
+      fromRegister:
+        type: u32
+        address: 13018
         mapValue:
           x: 100*x
 
@@ -97,6 +197,64 @@ metrics:
         mapValue:
           x: x/10
 
+  - name: dc_power_total_watts
+    alias: sunspec_DC_Watts_DCW_W
+    type: gauge
+    value:
+      fromRegister:
+        type: u32
+        address: 5017
+
+  - name: phase_voltage_a_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5019
+        mapValue:
+          x: x/10
+  - name: phase_voltage_b_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5020
+        mapValue:
+          x: x/10
+  - name: phase_voltage_c_volts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5021
+        mapValue:
+          x: x/10
+
+  - name: phase_current_a_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 13031
+        mapValue:
+          x: x/10
+  - name: phase_current_b_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 13032
+        mapValue:
+          x: x/10
+  - name: phase_current_c_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: s16
+        address: 13033
+        mapValue:
+          x: x/10
+
   - name: reactive_power_vars
     type: gauge
     value:
@@ -122,6 +280,47 @@ metrics:
         mapValue:
           x: x/10
 
+  - name: export_limit_watts
+    type: gauge
+    value:
+      fromExpression: 1
+    labels:
+      - name: min
+        value:
+          fromRegister:
+            type: u16
+            address: 5622
+            mapValue:
+              x: 10*x
+      - name: max
+        value:
+          fromRegister:
+            type: u16
+            address: 5623
+            mapValue:
+              x: 10*x
+  - name: bdc_rated_power_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5628
+        mapValue:
+          x: 100*x
+
+  - name: bms_max_charging_current_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5635
+  - name: bms_max_discharging_current_amperes
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 5636
+
   - name: pv_power_today_watts
     type: gauge
     value:
@@ -129,6 +328,28 @@ metrics:
         type: u16
         address: 6100
         length: 96
+  - name: direct_power_consumption_today_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6290
+        length: 96
+  - name: export_power_from_pv_today_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6469
+        length: 96
+  - name: batter_charge_power_today_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6648
+        length: 96
+
   - name: pv_yields_daily_kilowatthours
     type: gauge
     value:
@@ -156,4 +377,115 @@ metrics:
         length: 20
         mapValue:
           x: "x == 4294967295 ? 0 : x/10"
+
+  - name: direct_energy_consumption_daily_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6386
+        length: 31
+        mapValue:
+          x: x/10
+  - name: direct_energy_consumption_monthly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6417
+        length: 12
+        mapValue:
+          x: x/10
+  - name: direct_energy_consumption_yearly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u32
+        address: 6429
+        length: 20
+        mapValue:
+          x: "x == 4294967295 ? 0 : x/10"
+
+  - name: export_energy_from_pv_daily_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6565
+        length: 31
+        mapValue:
+          x: x/10
+  - name: export_energy_from_pv_monthly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6596
+        length: 12
+        mapValue:
+          x: x/10
+  - name: export_energy_from_pv_yearly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u32
+        address: 6608
+        length: 20
+        mapValue:
+          x: "x == 4294967295 ? 0 : x/10"
+
+  - name: battery_charge_energy_daily_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6744
+        length: 31
+        mapValue:
+          x: x/10
+  - name: battery_charge_energy_monthly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 6775
+        length: 12
+        mapValue:
+          x: x/10
+  - name: battery_charge_energy_yearly_kilowatthours
+    type: gauge
+    value:
+      fromRegister:
+        type: u32
+        address: 6787
+        length: 20
+        mapValue:
+          x: "x == 4294967295 ? 0 : x/10"
+
+  - name: system_state
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13000
+  - name: running_state
+    type: gauge
+    value:
+      fromRegister:
+        type: u16
+        address: 13001
+
+  - name: load_power_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: s32
+        address: 13008
+
+  - name: export_power_watts
+    type: gauge
+    value:
+      fromRegister:
+        type: s32
+        address: 13010
 
