@@ -580,7 +580,7 @@
   type: u32
   address: 13076
 
-- name: R088_bms_alarm_2
+- name: R101_bms_alarm_2
   type: u32
   address: 13078
 
