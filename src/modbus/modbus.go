@@ -2,8 +2,13 @@ package modbus
 
 import (
 	"github.com/goburrow/modbus"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"io"
+	"os"
 	"sungrow-prometheus-exporter/src/modbus/cache"
 	"sungrow-prometheus-exporter/src/util"
+	"syscall"
 	"time"
 )
 
@@ -34,15 +39,11 @@ func (r *RegisterReader) Read(address, quantity uint16) ([]uint16, error) {
 }
 
 func (r *RegisterReader) readChunked(address, quantity uint16) ([]uint16, error) {
-	err := r.handler.Connect()
-	if err != nil {
-		return nil, err
-	}
 	var result []byte
 	leftToRead := quantity
 	offset := uint16(0)
 	for leftToRead > 0 {
-		chunk, err := r.client.ReadInputRegisters(address-1+offset, util.Min(leftToRead, 125))
+		chunk, err := r.readWithRetry(address+offset, util.Min(leftToRead, 125), 10, 30*time.Millisecond)
 		if err != nil {
 			return nil, err
 		}
@@ -52,6 +53,29 @@ func (r *RegisterReader) readChunked(address, quantity uint16) ([]uint16, error)
 		offset += read
 	}
 	return convertBytesToUInt16(result), nil
+}
+
+func (r *RegisterReader) readWithRetry(address, quantity uint16, retriesLeft int, backoff time.Duration) ([]byte, error) {
+	chunk, err := r.client.ReadInputRegisters(address-1, quantity)
+	if err != nil {
+		// always close handler to force reconnect on next read
+		if err := r.handler.Close(); err != nil {
+			return nil, errors.Wrapf(err, "cannot close handler after error")
+		}
+		// Sungrow inverters have the nasty property to RST the TCP connection whenever
+		// someone else communicates with the device
+		if util.IsAnyError(err, syscall.EPIPE, syscall.ECONNRESET, io.EOF, io.ErrUnexpectedEOF) || os.IsTimeout(err) {
+			if retriesLeft == 0 {
+				return nil, errors.Wrapf(err, "retries exhausted")
+			}
+			retriesLeft--
+			log.Infof("Re-trying read %d[%d] in %s, %d retries left", address, quantity, backoff, retriesLeft)
+			time.Sleep(backoff)
+			return r.readWithRetry(address, quantity, retriesLeft, 2*backoff)
+		}
+		return nil, err
+	}
+	return chunk, err
 }
 
 func convertBytesToUInt16(bytes []byte) []uint16 {
