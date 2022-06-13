@@ -31,10 +31,10 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
-func FindAddressIntervals(registerConfigs []*config.Register) util.Intervals[uint16] {
+func FindAddressIntervals(registerNames []string, registerConfigs config.Registers) util.Intervals[uint16] {
 	var addressIntervals util.Intervals[uint16]
-	for _, registerConfig := range registerConfigs {
-		addressIntervals = append(addressIntervals, NewFromConfig(registerConfig).getAddressInterval())
+	for _, registerName := range registerNames {
+		addressIntervals = append(addressIntervals, NewFromConfig(registerConfigs[registerName]).getAddressInterval())
 	}
 	return addressIntervals
 }

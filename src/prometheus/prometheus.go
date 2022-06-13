@@ -24,18 +24,18 @@ func ListenAndServe(path string, port uint16) {
 	}
 }
 
-func RegisterMetric(reader register.Reader, metricConfig *config.Metric) {
+func RegisterMetric(reader register.Reader, metricConfig *config.Metric, registersConfig config.Registers) {
 	labels := prometheus.Labels{}
 	for _, labelConfig := range metricConfig.Labels {
-		labels[labelConfig.Name] = readStringValue(reader, labelConfig.Value)
+		labels[labelConfig.Name] = readStringValue(reader, labelConfig.Value, registersConfig)
 	}
-	buildValueFunc(reader, metricConfig.Value, func(idxValue string, valueFunc func() float64) {
+	buildValueFunc(reader, metricConfig.Value, registersConfig, func(idxValue string, unit string, valueFunc func() float64) {
 		if len(idxValue) > 0 {
 			labels["idx"] = idxValue
 		}
 		opts := []prometheus.Opts{{
 			Namespace:   namespace,
-			Name:        metricConfig.Name,
+			Name:        appendPluralUnitToName(metricConfig.Name, unit),
 			Help:        metricConfig.Help,
 			ConstLabels: labels,
 		}}
@@ -57,8 +57,19 @@ func RegisterMetric(reader register.Reader, metricConfig *config.Metric) {
 	})
 }
 
-func readStringValue(reader register.Reader, valueConfig *config.Value) string {
-	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
+func appendPluralUnitToName(name string, unit string) string {
+	if len(unit) == 0 {
+		return name
+	}
+	if lastCharacter := unit[len(unit)-1]; lastCharacter == 'z' || lastCharacter == 's' {
+		return name + "_" + unit
+	}
+	return name + "_" + unit + "s"
+}
+
+func readStringValue(reader register.Reader, valueConfig *config.Value, registersConfig config.Registers) string {
+	if registerValue := valueConfig.FromRegister; registerValue != nil {
+		registerConfig := registersConfig[registerValue.Name]
 		value, err := register.NewFromConfig(registerConfig).ReadString(reader)
 		if err != nil {
 			panic(err.Error())
@@ -75,8 +86,9 @@ func readStringValue(reader register.Reader, valueConfig *config.Value) string {
 	panic("cannot read register value for metric")
 }
 
-func buildValueFunc(reader register.Reader, valueConfig *config.Value, consumer func(idxValue string, valueFunc func() float64)) {
-	if registerConfig := valueConfig.FromRegister; registerConfig != nil {
+func buildValueFunc(reader register.Reader, valueConfig *config.Value, registersConfig config.Registers, consumer func(idxValue string, unit string, valueFunc func() float64)) {
+	if registerValue := valueConfig.FromRegister; registerValue != nil {
+		registerConfig := registersConfig[registerValue.Name]
 		indexedValueFunc := func(i uint16) float64 {
 			value, err := register.NewFromConfig(registerConfig).ReadFloat64(reader, i)
 			if err != nil {
@@ -88,12 +100,12 @@ func buildValueFunc(reader register.Reader, valueConfig *config.Value, consumer 
 		if registerConfig.Length > 1 {
 			for i := uint16(0); i < registerConfig.Length; i++ {
 				idx := i
-				consumer(fmt.Sprintf("%02d", i), func() float64 {
+				consumer(fmt.Sprintf("%02d", i), registerConfig.Unit, func() float64 {
 					return indexedValueFunc(idx)
 				})
 			}
 		} else {
-			consumer("", func() float64 {
+			consumer("", registerConfig.Unit, func() float64 {
 				return indexedValueFunc(0)
 			})
 		}
@@ -103,7 +115,7 @@ func buildValueFunc(reader register.Reader, valueConfig *config.Value, consumer 
 		if err != nil {
 			panic(err.Error())
 		}
-		consumer("", func() float64 {
+		consumer("", "", func() float64 {
 			return value.(float64)
 		})
 	}

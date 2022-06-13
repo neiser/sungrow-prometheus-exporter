@@ -1,0 +1,341 @@
+- name: device_info
+  help: "Device Info (constant value)"
+  type: gauge
+  value:
+    fromExpression: 1
+  labels:
+    - name: model
+      value:
+        fromRegister: R007_device_type_code
+    - name: sn
+      value:
+        fromRegister: R006_serial_number
+    - name: arm_sw_ver
+      value:
+        fromRegister: R003_arm_software_version
+    - name: dsp_sw_ver
+      value:
+        fromRegister: R004_dsp_software_version
+    - name: protocol_no
+      value:
+        fromRegister: R001_protocol_number
+    - name: protocol_ver
+      value:
+        fromRegister: R002_protocol_version
+    - name: nominal_output_power
+      value:
+        fromRegister: R008_nominal_output_power
+    - name: output_type
+      value:
+        fromRegister: R008_nominal_output_power
+
+- name: output_energy_daily
+  type: counter
+  value:
+    fromRegister: R010_daily_output_energy
+
+- name: output_energy_total
+  alias: sunspec_WattHours_WH_Wh
+  type: counter
+  value:
+    fromRegister: R011_total_output_energy
+
+- name: pv_yield_daily
+  type: counter
+  value:
+    fromRegister: R052_daily_pv_generation
+
+- name: pv_yield_total
+  type: counter
+  value:
+    fromRegister: R053_total_pv_generation
+
+- name: export_energy_from_pv_daily
+  type: counter
+  value:
+    fromRegister: R054_daily_export_energy_from_pv
+
+- name: export_energy_from_pv_total
+  type: counter
+  value:
+    fromRegister: R055_total_export_energy_from_pv
+
+- name: import_energy_daily
+  type: counter
+  value:
+    fromRegister: R077_daily_import_energy
+
+- name: import_energy_total
+  type: counter
+  value:
+    fromRegister: R078_total_import_energy
+
+- name: export_energy_daily
+  type: counter
+  value:
+    fromRegister: R084_daily_export_energy
+
+- name: export_energy_total
+  type: counter
+  value:
+    fromRegister: R085_total_export_energy
+
+- name: battery_charge_energy_from_pv_daily
+  type: counter
+  value:
+    fromRegister: R058_daily_battery_charge_energy_from_pv
+
+- name: battery_charge_energy_from_pv_total
+  type: counter
+  value:
+    fromRegister: R059_total_battery_charge_energy_from_pv
+
+- name: charge_energy_daily
+  type: counter
+  value:
+    fromRegister: R080_charge_energy_daily
+
+- name: charge_energy_total
+  type: counter
+  value:
+    fromRegister: R081_total_charge_energy
+
+- name: direct_energy_consumption_daily
+  type: counter
+  value:
+    fromRegister: R061_daily_direct_energy_consumption
+
+- name: direct_energy_consumption_total
+  type: counter
+  value:
+    fromRegister: R062_total_direct_energy_consumption
+
+- name: battery_discharge_energy_daily
+  type: counter
+  value:
+    fromRegister: R069_daily_battery_discharge_energy
+
+- name: battery_discharge_energy_total
+  type: counter
+  value:
+    fromRegister: R070_total_battery_discharge_energy
+
+- name: cabinet_temperature
+  type: gauge
+  alias: sunspec_Cabinet_Temperature_TmpCab_C
+  value:
+    fromRegister: R013_inside_temperature
+
+- name: mppt1_voltage
+  type: gauge
+  value:
+    fromRegister: R015_mppt1_voltage
+- name: mppt1_current
+  type: gauge
+  value:
+    fromRegister: R016_mppt1_current
+- name: mppt2_voltage
+  type: gauge
+  value:
+    fromRegister: R017_mppt2_voltage
+- name: mppt2_current
+  type: gauge
+  value:
+    fromRegister: R018_mppt2_current
+
+- name: dc_power_total
+  alias: sunspec_DC_Watts_DCW_W
+  type: gauge
+  value:
+    fromRegister: R020_total_dc_power
+
+- name: phase_voltage_a
+  type: gauge
+  value:
+    fromRegister: R021_phase_a_voltage
+- name: phase_voltage_b
+  type: gauge
+  value:
+    fromRegister: R022_phase_b_voltage
+- name: phase_voltage_c
+  type: gauge
+  value:
+    fromRegister: R023_phase_c_voltage
+
+- name: phase_current_a
+  type: gauge
+  value:
+    fromRegister: R073_phase_a_current
+- name: phase_current_b
+  type: gauge
+  value:
+    fromRegister: R074_phase_b_current
+- name: phase_current_c
+  type: gauge
+  value:
+    fromRegister: R075_phase_c_current
+
+- name: reactive_power
+  type: gauge
+  value:
+    fromRegister: R025_reactive_power
+
+- name: power_factor
+  type: gauge
+  value:
+    fromRegister: R026_power_factor
+
+- name: grid_frequency
+  type: gauge
+  value:
+    fromRegister: R027_grid_frequency
+
+- name: export_limit
+  type: gauge
+  value:
+    fromExpression: 1
+  labels:
+    - name: min
+      value:
+        fromRegister: R028_export_limit_min
+    - name: max
+      value:
+        fromRegister: R029_export_limit_max
+- name: bdc_rated_power
+  type: gauge
+  value:
+    fromRegister: R030_bdc_rated_power
+
+- name: bms_max_charging_current
+  type: gauge
+  value:
+    fromRegister: R031_max_charging_current_bms
+- name: bms_max_discharging_current
+  type: gauge
+  value:
+    fromRegister: R032_max_discharging_current_bms
+
+- name: pv_power_today
+  type: gauge
+  value:
+    fromRegister: R033_pv_power_of_today
+- name: direct_power_consumption_from_pv_today
+  type: gauge
+  value:
+    fromRegister: R038_direct_power_consumption_of_today_from_pv
+- name: export_power_from_pv_today
+  type: gauge
+  value:
+    fromRegister: R042_export_power_from_pv_of_today
+- name: battery_charge_power_today
+  type: gauge
+  value:
+    fromRegister: R046_battery_charge_power_of_today
+
+- name: pv_yields_daily
+  type: gauge
+  value:
+    fromRegister: R034_daily_pv_yields
+- name: pv_yields_monthly
+  type: gauge
+  value:
+    fromRegister: R035_monthly_pv_yields
+- name: pv_yields_yearly
+  type: gauge
+  value:
+    fromRegister: R037_yearly_pv_yields
+
+- name: direct_energy_consumption_daily
+  type: gauge
+  value:
+    fromRegister: R039_daily_direct_energy_consumption_from_pv
+- name: direct_energy_consumption_monthly
+  type: gauge
+  value:
+    fromRegister: R040_monthly_direct_energy_consumption_from_pv
+- name: direct_energy_consumption_yearly
+  type: gauge
+  value:
+    fromRegister: R041_yearly_direct_energy_consumption_yearly
+
+- name: export_energy_from_pv_daily
+  type: gauge
+  value:
+    fromRegister: R043_daily_export_energy_from_pv
+- name: export_energy_from_pv_monthly
+  type: gauge
+  value:
+    fromRegister: R044_monthly_export_energy_from_pv
+- name: export_energy_from_pv_yearly
+  type: gauge
+  value:
+    fromRegister: R045_yearly_export_energy_from_pv
+
+- name: battery_charge_energy_daily
+  type: gauge
+  value:
+    fromRegister: R047_daily_battery_charge_energy_from_pv
+- name: battery_charge_energy_monthly
+  type: gauge
+  value:
+    fromRegister: R048_monthly_battery_charge_energy_from_pv
+- name: battery_charge_energy_yearly
+  type: gauge
+  value:
+    fromRegister: R049_yearly_battery_charge_energy_from_pv
+
+- name: system_state
+  type: gauge
+  value:
+    fromRegister: R050_system_state
+- name: running_state
+  type: gauge
+  value:
+    fromRegister: R051_running_state
+- name: grid_state
+  type: gauge
+  value:
+    fromRegister: R072_grid_state
+
+- name: load_power
+  type: gauge
+  value:
+    fromRegister: R056_load_power
+- name: export_power
+  type: gauge
+  value:
+    fromRegister: R057_export_power
+- name: total_active_power
+  type: gauge
+  value:
+    fromRegister: R076_total_active_power
+
+- name: self_consumption_ratio
+  type: gauge
+  value:
+    fromRegister: R071_self_consumption_of_today
+
+- name: battery_voltage
+  type: gauge
+  value:
+    fromRegister: R063_battery_voltage
+- name: battery_current
+  type: gauge
+  value:
+    fromRegister: R064_battery_current
+- name: battery_power
+  type: gauge
+  value:
+    fromRegister: R065_battery_power
+- name: battery_level
+  type: gauge
+  value:
+    fromRegister: R066_battery_level
+- name: battery_health
+  type: gauge
+  value:
+    fromRegister: R067_battery_state_of_healthy
+- name: battery_temperature
+  type: gauge
+  value:
+    fromRegister: R068_battery_temperature

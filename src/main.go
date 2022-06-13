@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/spf13/cobra"
 	"os"
 	configPkg "sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/modbus"
@@ -9,25 +11,34 @@ import (
 )
 
 func main() {
-	config, err := configPkg.ReadFromFile(getConfigYamlFilename())
-	if err != nil {
-		panic(err.Error())
+
+	var inverterAddress string
+
+	rootCmd := &cobra.Command{
+		Use:   "sungrow-prometheus-exporter",
+		Short: "Prometheus Exporter for Sungrow inverters",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config, err := configPkg.Read()
+			if err != nil {
+				return err
+			}
+
+			addressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisterNames(), config.Registers)
+			reader := modbus.NewReader(inverterAddress, addressIntervals)
+			defer reader.Close()
+
+			for _, metricConfig := range config.Metrics {
+				prometheus.RegisterMetric(reader.Read, metricConfig, config.Registers)
+			}
+			prometheus.ListenAndServe("/", 8080)
+			return nil
+		},
 	}
 
-	addressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisters())
-	reader := modbus.NewReader(config.Inverter.Address, addressIntervals)
-	defer reader.Close()
+	rootCmd.Flags().StringVar(&inverterAddress, "inverter-address", "sungrow:502", "Address as 'host:port' of inverter")
 
-	for _, metricConfig := range config.Metrics {
-		prometheus.RegisterMetric(reader.Read, metricConfig)
+	if err := rootCmd.Execute(); err != nil {
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	prometheus.ListenAndServe("/", 8080)
-}
-
-func getConfigYamlFilename() string {
-	dir := "."
-	if koDataPath := os.Getenv("KO_DATA_PATH"); len(koDataPath) > 0 {
-		dir = koDataPath
-	}
-	return dir + "/config.yaml"
 }
