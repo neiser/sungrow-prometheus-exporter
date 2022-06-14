@@ -2,11 +2,12 @@ package cache
 
 import (
 	log "github.com/sirupsen/logrus"
-	"sungrow-prometheus-exporter/src/register"
 	"sungrow-prometheus-exporter/src/util"
 	"sync"
 	"time"
 )
+
+type Reader func(address, quantity uint16) ([]uint16, error)
 
 type Cache struct {
 	expiry           time.Duration
@@ -21,7 +22,7 @@ func New(addressIntervals util.Intervals[uint16]) *Cache {
 		return &Cache{}
 	}
 	addressIntervals.SortAndConcat()
-	log.Infof("Initializing reader cache for address intervals %v", addressIntervals)
+	log.Infof("Initializing cache for address intervals %v", addressIntervals)
 	return &Cache{
 		expiry:           500 * time.Millisecond,
 		addressIntervals: addressIntervals,
@@ -29,9 +30,8 @@ func New(addressIntervals util.Intervals[uint16]) *Cache {
 	}
 }
 
-func (c *Cache) Read(address uint16, quantity uint16, reader register.Reader) ([]uint16, error) {
-	addressInterval := c.findAddressInterval(address, quantity)
-	if addressInterval == nil {
+func (c *Cache) Read(address uint16, quantity uint16, reader Reader) ([]uint16, error) {
+	if c.isAddressOutsideCache(address, quantity) {
 		return reader(address, quantity)
 	}
 	c.mutex.RLock()
@@ -51,7 +51,7 @@ func (c *Cache) Read(address uint16, quantity uint16, reader register.Reader) ([
 	} else {
 		defer c.mutex.RUnlock()
 	}
-	return c.readCache(addressInterval, address, quantity), nil
+	return c.readCache(address, quantity), nil
 }
 
 func getSize(addressIntervals util.Intervals[uint16]) uint16 {
@@ -65,17 +65,17 @@ func getSize(addressIntervals util.Intervals[uint16]) uint16 {
 	return endAddress - startAddress + 1
 }
 
-func (c *Cache) findAddressInterval(address uint16, quantity uint16) *util.Interval[uint16] {
+func (c *Cache) isAddressOutsideCache(address uint16, quantity uint16) bool {
 	endAddress := address + quantity - 1
 	for _, addressInterval := range c.addressIntervals {
 		if addressInterval.Contains(address) && addressInterval.End >= endAddress {
-			return addressInterval
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
-func (c *Cache) readCache(addressInterval *util.Interval[uint16], address uint16, quantity uint16) []uint16 {
+func (c *Cache) readCache(address uint16, quantity uint16) []uint16 {
 	startIdx := address - c.addressIntervals[0].Start
 	return c.values[startIdx : startIdx+quantity]
 }
@@ -84,7 +84,7 @@ func (c *Cache) expired() bool {
 	return c.lastUpdate.Before(time.Now().Add(-c.expiry))
 }
 
-func (c *Cache) update(reader register.Reader) error {
+func (c *Cache) update(reader Reader) error {
 	startAddress := c.addressIntervals[0].Start
 	for _, addressInterval := range c.addressIntervals {
 		quantity := addressInterval.Length()

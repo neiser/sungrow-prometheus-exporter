@@ -16,6 +16,7 @@ type Register struct {
 	Name     string       `yaml:"name"`
 	Type     RegisterType `yaml:"type"`
 	Address  uint16       `yaml:"address"`
+	Writable bool         `yaml:"writable"`
 	Length   uint16       `yaml:"length"`
 	Unit     string       `yaml:"unit"`
 	MapValue MapValue     `yaml:"mapValue"`

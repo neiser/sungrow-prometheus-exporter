@@ -8,7 +8,7 @@ import (
 	"sungrow-prometheus-exporter/src/util"
 )
 
-type Reader func(address, quantity uint16) ([]uint16, error)
+type Reader func(address, quantity uint16, writable bool) ([]uint16, error)
 
 type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
@@ -32,12 +32,16 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
-func FindAddressIntervals(registerNames []string, registerConfigs config.Registers) util.Intervals[uint16] {
-	var addressIntervals util.Intervals[uint16]
+func FindAddressIntervals(registerNames []string, registerConfigs config.Registers) (readAddressIntervals util.Intervals[uint16], writeAddressIntervals util.Intervals[uint16]) {
 	for _, registerName := range registerNames {
-		addressIntervals = append(addressIntervals, NewFromConfig(registerConfigs[registerName]).getAddressInterval())
+		registerConfig := registerConfigs[registerName]
+		if registerConfig.Writable {
+			writeAddressIntervals = append(writeAddressIntervals, NewFromConfig(registerConfig).getAddressInterval())
+		} else {
+			readAddressIntervals = append(readAddressIntervals, NewFromConfig(registerConfig).getAddressInterval())
+		}
 	}
-	return addressIntervals
+	return
 }
 
 type register struct {
@@ -58,7 +62,8 @@ type mappers struct {
 type integerRegister struct {
 	register
 	mappers
-	length uint16
+	length   uint16
+	writable bool
 }
 
 func newStringRegister(registerConfig *config.Register) *stringRegister {
@@ -77,7 +82,7 @@ func (r *stringRegister) ReadFloat64(Reader, uint16) (float64, error) {
 }
 
 func (r *stringRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader(r.baseAddress, r.width)
+	data, err := reader(r.baseAddress, r.width, false)
 	if err != nil {
 		return "", err
 	}
@@ -143,6 +148,7 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 			},
 		},
 		length,
+		registerConfig.Writable,
 	}
 }
 
@@ -151,7 +157,7 @@ func (r *integerRegister) getAddressInterval() *util.Interval[uint16] {
 }
 
 func (r *integerRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader(r.baseAddress, r.width)
+	data, err := reader(r.baseAddress, r.width, r.writable)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +168,7 @@ func (r *integerRegister) ReadFloat64(reader Reader, index uint16) (float64, err
 	if index >= r.length {
 		panic("register index out of range")
 	}
-	data, err := reader(r.baseAddress+index*r.width, r.width)
+	data, err := reader(r.baseAddress+index*r.width, r.width, r.writable)
 	if err != nil {
 		return 0, err
 	}

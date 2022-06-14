@@ -13,18 +13,22 @@ import (
 )
 
 type RegisterReader struct {
-	handler *modbus.TCPClientHandler
-	client  modbus.Client
-	cache   *cache.Cache
+	handler    *modbus.TCPClientHandler
+	client     modbus.Client
+	readCache  *cache.Cache
+	writeCache *cache.Cache
 }
 
-func NewReader(address string, addressIntervals util.Intervals[uint16]) *RegisterReader {
+func NewReader(address string, readAddressIntervals, writeAddressIntervals util.Intervals[uint16]) *RegisterReader {
 	handler := modbus.NewTCPClientHandler(address)
 	handler.Timeout = 3 * time.Second
 	handler.IdleTimeout = 5 * time.Second
 	handler.SlaveId = 0x1
 	client := modbus.NewClient(handler)
-	return &RegisterReader{handler, client, cache.New(addressIntervals)}
+	return &RegisterReader{handler, client,
+		cache.New(readAddressIntervals),
+		cache.New(writeAddressIntervals),
+	}
 }
 
 func (r *RegisterReader) Close() {
@@ -34,16 +38,31 @@ func (r *RegisterReader) Close() {
 	}
 }
 
-func (r *RegisterReader) Read(address, quantity uint16) ([]uint16, error) {
-	return r.cache.Read(address, quantity, r.readChunked)
+func (r *RegisterReader) Read(address, quantity uint16, writable bool) ([]uint16, error) {
+	c := func() *cache.Cache {
+		if writable {
+			return r.writeCache
+		} else {
+			return r.readCache
+		}
+	}()
+	return c.Read(address, quantity, func(address, quantity uint16) ([]uint16, error) {
+		return r.readChunked(address, quantity, writable)
+	})
 }
 
-func (r *RegisterReader) readChunked(address, quantity uint16) ([]uint16, error) {
+const (
+	maxQuantity         = 125
+	maxRetries          = 10
+	initialRetryBackoff = 30 * time.Millisecond
+)
+
+func (r *RegisterReader) readChunked(address, quantity uint16, writable bool) ([]uint16, error) {
 	var result []byte
 	leftToRead := quantity
 	offset := uint16(0)
 	for leftToRead > 0 {
-		chunk, err := r.readWithRetry(address+offset, util.Min(leftToRead, 125), 10, 30*time.Millisecond)
+		chunk, err := r.readWithRetry(address+offset, util.Min(leftToRead, maxQuantity), writable, maxRetries, initialRetryBackoff)
 		if err != nil {
 			return nil, err
 		}
@@ -55,8 +74,14 @@ func (r *RegisterReader) readChunked(address, quantity uint16) ([]uint16, error)
 	return convertBytesToUInt16(result), nil
 }
 
-func (r *RegisterReader) readWithRetry(address, quantity uint16, retriesLeft int, backoff time.Duration) ([]byte, error) {
-	chunk, err := r.client.ReadInputRegisters(address-1, quantity)
+func (r *RegisterReader) readWithRetry(address, quantity uint16, writable bool, retriesLeft int, backoff time.Duration) ([]byte, error) {
+	chunk, err := func() ([]byte, error) {
+		if writable {
+			return r.client.ReadHoldingRegisters(address-1, quantity)
+		} else {
+			return r.client.ReadInputRegisters(address-1, quantity)
+		}
+	}()
 	if err != nil {
 		// always close handler to force reconnect on next read
 		if err := r.handler.Close(); err != nil {
@@ -71,7 +96,7 @@ func (r *RegisterReader) readWithRetry(address, quantity uint16, retriesLeft int
 			retriesLeft--
 			log.Infof("Re-trying read %d[%d] in %s, %d retries left", address, quantity, backoff, retriesLeft)
 			time.Sleep(backoff)
-			return r.readWithRetry(address, quantity, retriesLeft, 2*backoff)
+			return r.readWithRetry(address, quantity, writable, retriesLeft, 2*backoff)
 		}
 		return nil, err
 	}

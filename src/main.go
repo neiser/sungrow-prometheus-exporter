@@ -23,8 +23,8 @@ func main() {
 				return err
 			}
 
-			addressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisterNames(), config.Registers)
-			reader := modbus.NewReader(inverterAddress, addressIntervals)
+			readAddressIntervals, writeAddressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisterNames(), config.Registers)
+			reader := modbus.NewReader(inverterAddress, readAddressIntervals, writeAddressIntervals)
 			defer reader.Close()
 
 			for _, metricConfig := range config.Metrics {

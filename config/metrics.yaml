@@ -1,3 +1,8 @@
+- name: clock_hour
+  type: gauge
+  value:
+    fromRegister: W004_system_clock_hour
+
 - name: device_info
   help: "Device Info (constant value)"
   type: gauge

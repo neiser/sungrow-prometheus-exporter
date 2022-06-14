@@ -31,6 +31,9 @@ func (intervals Intervals[T]) Sort() {
 }
 
 func (intervals *Intervals[T]) SortAndConcat() {
+	if len(*intervals) < 2 {
+		return
+	}
 	intervals.Sort()
 	var result Intervals[T]
 	var current *Interval[T]

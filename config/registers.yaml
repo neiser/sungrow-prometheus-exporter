@@ -587,3 +587,35 @@
 # R102: reserved
 
 # R103-R121: not applicable
+
+- name: W001_system_clock_year
+  type: u16
+  address: 5000
+  writable: true
+
+- name: W002_system_clock_month
+  type: u16
+  address: 5001
+  writable: true
+
+- name: W003_system_clock_day
+  type: u16
+  address: 5002
+  writable: true
+
+- name: W004_system_clock_hour
+  type: u16
+  address: 5003
+  writable: true
+
+- name: W005_system_clock_minute
+  type: u16
+  address: 5004
+  writable: true
+
+- name: W006_system_clock_second
+  type: u16
+  address: 5005
+  writable: true
+
+# W007: reserved
