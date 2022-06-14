@@ -3,6 +3,7 @@ package register
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/util"
 )
@@ -116,6 +117,14 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 				return int64(result)
 			},
 			mapToFloat64: func(value int64) float64 {
+				if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
+					if mappedValue, ok := mapper[value]; ok {
+						convertedValue, err := strconv.ParseFloat(mappedValue, 64)
+						if err == nil {
+							return convertedValue
+						}
+					}
+				}
 				if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
 					return mapper(value)
 				}

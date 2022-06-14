@@ -16,7 +16,7 @@
   address: 4969
   length: 15
 
-# R05: reserved
+# R005: reserved
 
 - name: R006_serial_number
   type: string
@@ -61,7 +61,7 @@
   mapValue:
     x: 100*x
 
-# R12: reserved
+# R012: reserved
 
 - name: R013_inside_temperature
   type: s16
@@ -70,7 +70,7 @@
   mapValue:
     x: x/10
 
-# R14: reserved
+# R014: reserved
 
 - name: R015_mppt1_voltage
   type: u16
@@ -100,7 +100,7 @@
   mapValue:
     x: x/10
 
-# R19: reserved
+# R019: reserved
 
 - name: R020_total_dc_power
   type: u32
@@ -128,7 +128,7 @@
   mapValue:
     x: x/10
 
-# R24: reserved
+# R024: reserved
 
 - name: R025_reactive_power
   type: s32
@@ -201,7 +201,7 @@
   mapValue:
     x: 100*x
 
-# R36: reserved
+# R036: reserved
 
 - name: R037_yearly_pv_yields
   type: u32
@@ -442,9 +442,9 @@
 - name: R072_grid_state
   type: u16
   address: 13030
-#    mapValue:
-#      0xAA: "off_grid"
-#      0x55: "on_grid"
+  mapValue:
+    0xAA: '0' # off_grid
+    0x55: '1' # on_grid
 
 - name: R073_phase_a_current
   type: s16
@@ -486,7 +486,7 @@
   mapValue:
     x: 100*x
 
-# R79: not applicable
+# R079: not applicable
 
 - name: R080_charge_energy_daily
   type: u16
@@ -506,7 +506,7 @@
   type: u16
   address: 13043
 
-# R83: reserved
+# R083: reserved
 
 - name: R084_daily_export_energy
   type: u16
