@@ -77,7 +77,9 @@ func readStringValue(reader register.Reader, valueConfig *config.Value, register
 		return value
 	}
 	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
-		value, err := expressionConfig.Evaluate(map[string]interface{}{})
+		value, err := expressionConfig.Evaluate(func(registerName string) float64 {
+			return readRegister(registersConfig[registerName], reader, 0)
+		})
 		if err != nil {
 			panic(err.Error())
 		}
@@ -89,34 +91,37 @@ func readStringValue(reader register.Reader, valueConfig *config.Value, register
 func buildValueFunc(reader register.Reader, valueConfig *config.Value, registersConfig config.Registers, consumer func(idxValue string, unit string, valueFunc func() float64)) {
 	if registerValue := valueConfig.FromRegister; registerValue != nil {
 		registerConfig := registersConfig[registerValue.Name]
-		indexedValueFunc := func(i uint16) float64 {
-			value, err := register.NewFromConfig(registerConfig).ReadFloat64(reader, i)
-			if err != nil {
-				log.Warnf("Cannot read register: %s", err.Error())
-				return math.NaN()
-			}
-			return value
-		}
 		if registerConfig.Length > 1 {
 			for i := uint16(0); i < registerConfig.Length; i++ {
-				idx := i
-				consumer(fmt.Sprintf("%02d", i), registerConfig.Unit, func() float64 {
-					return indexedValueFunc(idx)
+				index := i // prevent lambda capture by reference!
+				consumer(fmt.Sprintf("%02d", index), registerConfig.Unit, func() float64 {
+					return readRegister(registerConfig, reader, index)
 				})
 			}
 		} else {
 			consumer("", registerConfig.Unit, func() float64 {
-				return indexedValueFunc(0)
+				return readRegister(registerConfig, reader, 0)
 			})
 		}
 	}
 	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
-		value, err := expressionConfig.Evaluate(map[string]interface{}{})
-		if err != nil {
-			panic(err.Error())
-		}
 		consumer("", "", func() float64 {
+			value, err := expressionConfig.Evaluate(func(registerName string) float64 {
+				return readRegister(registersConfig[registerName], reader, 0)
+			})
+			if err != nil {
+				panic(err.Error())
+			}
 			return value.(float64)
 		})
 	}
+}
+
+func readRegister(registerConfig *config.Register, reader register.Reader, index uint16) float64 {
+	value, err := register.NewFromConfig(registerConfig).ReadFloat64(reader, index)
+	if err != nil {
+		log.Warnf("Cannot read register: %s", err.Error())
+		return math.NaN()
+	}
+	return value
 }

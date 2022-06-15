@@ -1,7 +1,16 @@
-- name: clock_hour
+- name: clock
   type: gauge
   value:
-    fromRegister: W004_system_clock_hour
+    fromExpression: >- 
+      timeDate(
+        register('W001_system_clock_year'), 
+        register('W002_system_clock_month'),
+        register('W003_system_clock_day'),
+        register('W004_system_clock_hour'), 
+        register('W005_system_clock_minute'),
+        register('W006_system_clock_second'),
+        'Europe/Berlin'
+      )
 
 - name: device_info
   help: "Device Info (constant value)"
