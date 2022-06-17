@@ -2,7 +2,7 @@
   type: gauge
   value:
     fromExpression: >- 
-      timeDate(
+      timeDateUnix(
         register('W001_system_clock_year'), 
         register('W002_system_clock_month'),
         register('W003_system_clock_day'),

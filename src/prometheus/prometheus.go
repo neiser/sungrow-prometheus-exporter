@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/register"
+	"sungrow-prometheus-exporter/src/util"
 )
 
 const namespace = "sungrow"
@@ -112,7 +113,7 @@ func buildValueFunc(reader register.Reader, valueConfig *config.Value, registers
 			if err != nil {
 				panic(err.Error())
 			}
-			return value.(float64)
+			return util.NumericToFloat64(value)
 		})
 	}
 }

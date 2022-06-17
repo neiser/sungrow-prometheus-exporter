@@ -1,8 +1,9 @@
 package config
 
 import (
+	"github.com/antonmedv/expr"
+	"github.com/antonmedv/expr/vm"
 	"github.com/pkg/errors"
-	"gopkg.in/Knetic/govaluate.v3"
 	"gopkg.in/yaml.v3"
 	"time"
 )
@@ -44,8 +45,9 @@ type Value struct {
 }
 
 type ExpressionValue struct {
-	expression *govaluate.EvaluableExpression
-	registers  map[string]float64
+	program   *vm.Program
+	env       map[string]interface{}
+	registers map[string]float64
 }
 
 func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
@@ -54,14 +56,19 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 	if err != nil {
 		return err
 	}
+
+	program, err := expr.Compile(s)
+	if err != nil {
+		return errors.Wrapf(err, "cannot compile '%s'", s)
+	}
 	registers := make(map[string]float64)
-	functions := map[string]govaluate.ExpressionFunction{
-		"timeDate": func(args ...interface{}) (interface{}, error) {
+	env := map[string]interface{}{
+		"timeDateUnix": func(args ...interface{}) (interface{}, error) {
 			location, err := time.LoadLocation(args[6].(string))
 			if err != nil {
 				return nil, err
 			}
-			return float64(time.Date(
+			timeDate := time.Date(
 				int(args[0].(float64)),
 				time.Month(args[1].(float64)),
 				int(args[2].(float64)),
@@ -70,7 +77,8 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 				int(args[5].(float64)),
 				0,
 				location,
-			).Unix()), nil
+			)
+			return timeDate.Unix(), nil
 		},
 		"register": func(args ...interface{}) (interface{}, error) {
 			registerName := args[0].(string)
@@ -81,23 +89,19 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 			return registerValue, nil
 		},
 	}
-	expression, err := govaluate.NewEvaluableExpressionWithFunctions(s, functions)
+	_, err = vm.Run(program, env)
 	if err != nil {
-		return errors.Wrapf(err, "cannot parse '%s' as expression", s)
+		return errors.Wrapf(err, "cannot run '%s'", s)
 	}
-	_, err = expression.Evaluate(map[string]interface{}{})
-	if err != nil {
-		return errors.Wrapf(err, "cannot eval '%s'", s)
-	}
-	*v = ExpressionValue{expression, registers}
+	*v = ExpressionValue{program, env, registers}
 	return nil
 }
 
 func (v *ExpressionValue) Evaluate(registerValue func(registerName string) float64) (interface{}, error) {
-	for registerName, _ := range v.registers {
+	for registerName := range v.registers {
 		v.registers[registerName] = registerValue(registerName)
 	}
-	result, err := v.expression.Evaluate(map[string]interface{}{})
+	result, err := vm.Run(v.program, v.env)
 	if err != nil {
 		return 0, err
 	}
@@ -125,7 +129,7 @@ func (metrics Metrics) FindRegisterNames() []string {
 			r = append(r, registerValue.Name)
 		}
 		if expressionValue := metric.Value.FromExpression; expressionValue != nil {
-			for registerName, _ := range expressionValue.registers {
+			for registerName := range expressionValue.registers {
 				r = append(r, registerName)
 			}
 		}

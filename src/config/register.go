@@ -1,9 +1,11 @@
 package config
 
 import (
+	"github.com/antonmedv/expr"
+	"github.com/antonmedv/expr/vm"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/Knetic/govaluate.v3"
 	"gopkg.in/yaml.v3"
+	"sungrow-prometheus-exporter/src/util"
 )
 
 type Registers map[string]*Register
@@ -54,17 +56,17 @@ func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
 		{
 			for x, y := range m {
 				if len(x) == 1 {
-					expression, err := govaluate.NewEvaluableExpression(y)
+					program, err := expr.Compile(y)
 					if err != nil {
-						log.Warnf("Ignoring unparsable expression '%s' (caused by '%s'), will assume one-element enum map", y, err.Error())
+						log.Warnf("Ignoring uncompilable expression '%s', will assume one-element enum map, caused by: %s", y, err.Error())
 						continue
 					}
 					mapValue.ByFunction = func(value int64) float64 {
-						result, err := expression.Evaluate(map[string]interface{}{x: value})
+						result, err := vm.Run(program, map[string]interface{}{x: value})
 						if err != nil {
 							panic(err.Error())
 						}
-						return result.(float64)
+						return util.NumericToFloat64(result)
 					}
 					return nil
 				}
