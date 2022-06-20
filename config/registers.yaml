@@ -592,30 +592,98 @@
   type: u16
   address: 5000
   writable: true
+  validation:
+    year: 'year > 2000'
 
 - name: W002_system_clock_month
   type: u16
   address: 5001
   writable: true
+  validation:
+    month: 'month >= 1 && month <= 12'
 
 - name: W003_system_clock_day
   type: u16
   address: 5002
   writable: true
+  validation:
+    day: 'day >= 1 && day <= 31'
 
 - name: W004_system_clock_hour
   type: u16
   address: 5003
   writable: true
+  validation:
+    hour: 'hour >= 0 && hour <= 23'
 
 - name: W005_system_clock_minute
   type: u16
   address: 5004
   writable: true
+  validation:
+    minute: 'minute >= 0 && minute <= 59'
 
 - name: W006_system_clock_second
   type: u16
   address: 5005
   writable: true
+  validation:
+    second: 'second >= 0 && second <= 59'
 
 # W007: reserved
+
+- name: W008_start_stop
+  type: u16
+  address: 13000
+  writable: true
+  mapValue:
+    0xCF: Start
+    0xCE: Stop
+
+# W009: Not applicable
+
+- name: W010_load1_adjustment_mode
+  type: u16
+  address: 13002
+  writable: true
+  mapValue:
+    0: Timing
+    1: OnOff
+    2: PowerOptimized
+    3: Disabled
+
+# W029: reserved
+
+# W030-W032: not applicable
+
+- name: W033_max_soc
+  type: u16
+  address: 13058
+  writable: true
+  validation:
+    percent: 'percent >= 0.5 && percent <= 1'
+  mapValue:
+    x: x/1000
+
+- name: W034_min_soc
+  type: u16
+  address: 13059
+  writable: true
+  validation:
+    percent: 'percent >= 0.0 && percent <= 50.0'
+  mapValue:
+    x: x/10
+
+# W035-W038: not applicable
+
+# W039: reserved
+
+# W040-W048: not applicable
+
+- name: W049_export_power_limitation
+  type: u16
+  address: 13074
+  writable: true
+  unit: watt
+  validation:
+    limit: "limit >= register('R028_export_limit_min') && limit <= register('R029_export_limit_max')"

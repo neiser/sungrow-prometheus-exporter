@@ -2,7 +2,7 @@
   type: gauge
   value:
     fromExpression: >- 
-      timeDateUnix(
+      timeDate(
         register('W001_system_clock_year'), 
         register('W002_system_clock_month'),
         register('W003_system_clock_day'),
@@ -10,7 +10,12 @@
         register('W005_system_clock_minute'),
         register('W006_system_clock_second'),
         'Europe/Berlin'
-      )
+      ).Unix()
+
+- name: export_power_limit
+  type: gauge
+  value:
+    fromRegister: W049_export_power_limitation
 
 - name: device_info
   help: "Device Info (constant value)"
@@ -204,17 +209,6 @@
   value:
     fromRegister: R027_grid_frequency
 
-- name: export_limit
-  type: gauge
-  value:
-    fromExpression: 1
-  labels:
-    - name: min
-      value:
-        fromRegister: R028_export_limit_min
-    - name: max
-      value:
-        fromRegister: R029_export_limit_max
 - name: bdc_rated_power
   type: gauge
   value:

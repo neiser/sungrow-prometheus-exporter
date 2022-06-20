@@ -63,12 +63,12 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 	}
 	registers := make(map[string]float64)
 	env := map[string]interface{}{
-		"timeDateUnix": func(args ...interface{}) (interface{}, error) {
+		"timeDate": func(args ...interface{}) (interface{}, error) {
 			location, err := time.LoadLocation(args[6].(string))
 			if err != nil {
 				return nil, err
 			}
-			timeDate := time.Date(
+			return time.Date(
 				int(args[0].(float64)),
 				time.Month(args[1].(float64)),
 				int(args[2].(float64)),
@@ -77,8 +77,7 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 				int(args[5].(float64)),
 				0,
 				location,
-			)
-			return timeDate.Unix(), nil
+			), nil
 		},
 		"register": func(args ...interface{}) (interface{}, error) {
 			registerName := args[0].(string)
