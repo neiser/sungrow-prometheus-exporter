@@ -244,6 +244,7 @@
 - name: R042_export_power_from_pv_of_today
   type: u16
   address: 6469
+  unit: watt
   length: 96
 
 - name: R043_daily_export_energy_from_pv
@@ -273,6 +274,7 @@
 - name: R046_battery_charge_power_of_today
   type: u16
   address: 6648
+  unit: watt
   length: 96
 
 - name: R047_daily_battery_charge_energy_from_pv
