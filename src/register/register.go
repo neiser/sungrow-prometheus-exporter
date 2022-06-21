@@ -32,7 +32,7 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
-func FindAddressIntervals(registerNames []string, registerConfigs config.Registers) (readAddressIntervals util.Intervals[uint16], writeAddressIntervals util.Intervals[uint16]) {
+func FindAddressIntervals(registerConfigs config.Registers, registerNames ...string) (readAddressIntervals util.Intervals[uint16], writeAddressIntervals util.Intervals[uint16]) {
 	for _, registerName := range registerNames {
 		registerConfig := registerConfigs[registerName]
 		if registerConfig.Writable {

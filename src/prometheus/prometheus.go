@@ -15,14 +15,9 @@ import (
 
 const namespace = "sungrow"
 
-func ListenAndServe(path string, port uint16) {
-	address := fmt.Sprintf(":%d", port)
-	log.Infof("Serving at %s%s...", address, path)
+func RegisterHttpHandler(path string) {
+	log.Infof("Serving metrics at path %s", path)
 	http.Handle(path, promhttp.Handler())
-	err := http.ListenAndServe(address, nil)
-	if err != nil {
-		panic(err.Error())
-	}
 }
 
 func RegisterMetric(reader register.Reader, metricConfig *config.Metric, registersConfig config.Registers) {

@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"net/http"
 	"os"
+	"sungrow-prometheus-exporter/src/actuator"
 	configPkg "sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/modbus"
 	"sungrow-prometheus-exporter/src/prometheus"
@@ -23,14 +26,20 @@ func main() {
 				return err
 			}
 
-			readAddressIntervals, writeAddressIntervals := register.FindAddressIntervals(config.Metrics.FindRegisterNames(), config.Registers)
+			readAddressIntervals, writeAddressIntervals := register.FindAddressIntervals(config.Registers,
+				config.Metrics.FindRegisterNames()...,
+			)
 			reader := modbus.NewReader(inverterAddress, readAddressIntervals, writeAddressIntervals)
 			defer reader.Close()
 
 			for _, metricConfig := range config.Metrics {
 				prometheus.RegisterMetric(reader.Read, metricConfig, config.Registers)
 			}
-			prometheus.ListenAndServe("/", 8080)
+			prometheus.RegisterHttpHandler("/")
+
+			actuator.RegisterHttpHandler("/actuator")
+
+			listenAndServe(8080)
 			return nil
 		},
 	}
@@ -40,5 +49,14 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func listenAndServe(port int) {
+	address := fmt.Sprintf(":%d", port)
+	log.Infof("Listening at %s", address)
+	err := http.ListenAndServe(address, nil)
+	if err != nil {
+		panic(err.Error())
 	}
 }

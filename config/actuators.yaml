@@ -1,0 +1,29 @@
+- name: clock
+  registers:
+    W001_system_clock_year:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Year()"
+    W002_system_clock_month:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Month()"
+    W003_system_clock_day:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Day()"
+    W004_system_clock_hour:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Hour()"
+    W005_system_clock_minute:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Minute()"
+    W006_system_clock_second:
+      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Second()"
+  mapValue: >-
+    timeDate(
+      register('W001_system_clock_year'), 
+      register('W002_system_clock_month'),
+      register('W003_system_clock_day'),
+      register('W004_system_clock_hour'), 
+      register('W005_system_clock_minute'),
+      register('W006_system_clock_second'),
+      'Europe/Berlin'
+    ).Format('2022-06-17 13:04:05 -0700')
+
+
+- name: start_stop
+  registers:
+    W008_start_stop: ~

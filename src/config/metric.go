@@ -11,7 +11,7 @@ import (
 type Metrics map[string]*Metric
 
 func (metrics *Metrics) UnmarshalYAML(node *yaml.Node) error {
-	return unmarshalSequenceToMap[Metric](node, (*map[string]*Metric)(metrics))
+	return unmarshalNamedSequenceToMap[Metric](node, (*map[string]*Metric)(metrics))
 }
 
 type Metric struct {

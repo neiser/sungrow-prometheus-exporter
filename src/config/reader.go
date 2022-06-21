@@ -9,22 +9,24 @@ import (
 type Config struct {
 	Metrics   Metrics
 	Registers Registers
+	Actuators Actuators
 }
 
 func Read() (*Config, error) {
 	configDir := getConfigDir()
-	metricsConfig, err := unmarshalFromFile[Metrics](path.Join(configDir, "metrics.yaml"))
+	metrics, err := unmarshalFromFile[Metrics](path.Join(configDir, "metrics.yaml"))
 	if err != nil {
 		return nil, err
 	}
-	registersConfig, err := unmarshalFromFile[Registers](path.Join(configDir, "registers.yaml"))
+	registers, err := unmarshalFromFile[Registers](path.Join(configDir, "registers.yaml"))
 	if err != nil {
 		return nil, err
 	}
-	return &Config{
-		Metrics:   *metricsConfig,
-		Registers: *registersConfig,
-	}, nil
+	actuators, err := unmarshalFromFile[Actuators](path.Join(configDir, "actuators.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	return &Config{*metrics, *registers, *actuators}, nil
 }
 
 func getConfigDir() string {

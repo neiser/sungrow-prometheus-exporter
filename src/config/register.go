@@ -1,27 +1,24 @@
 package config
 
 import (
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	"sungrow-prometheus-exporter/src/util"
 )
 
 type Registers map[string]*Register
 
 func (registers *Registers) UnmarshalYAML(node *yaml.Node) error {
-	return unmarshalSequenceToMap[Register](node, (*map[string]*Register)(registers))
+	return unmarshalNamedSequenceToMap[Register](node, (*map[string]*Register)(registers))
 }
 
 type Register struct {
-	Name     string       `yaml:"name"`
-	Type     RegisterType `yaml:"type"`
-	Address  uint16       `yaml:"address"`
-	Writable bool         `yaml:"writable"`
-	Length   uint16       `yaml:"length"`
-	Unit     string       `yaml:"unit"`
-	MapValue MapValue     `yaml:"mapValue"`
+	Name     string           `yaml:"name"`
+	Type     RegisterType     `yaml:"type"`
+	Address  uint16           `yaml:"address"`
+	Writable bool             `yaml:"writable"`
+	Length   uint16           `yaml:"length"`
+	Unit     string           `yaml:"unit"`
+	MapValue RegisterMapValue `yaml:"mapValue"`
 }
 
 func (m Register) getName() string {
@@ -38,12 +35,12 @@ const (
 	StringRegisterType RegisterType = "string"
 )
 
-type MapValue struct {
+type RegisterMapValue struct {
 	ByFunction func(value int64) float64
 	ByEnumMap  map[int64]string
 }
 
-func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
+func (mapValue *RegisterMapValue) UnmarshalYAML(node *yaml.Node) error {
 	m := map[string]string{}
 	err := node.Decode(m)
 	if err != nil {
@@ -51,26 +48,15 @@ func (mapValue *MapValue) UnmarshalYAML(node *yaml.Node) error {
 	}
 	switch len(m) {
 	case 0:
-		return &yaml.TypeError{Errors: []string{"mapValue should not be empty"}}
+		return typeError("mapValue should not be empty")
 	case 1:
 		{
-			for x, y := range m {
-				if len(x) == 1 {
-					program, err := expr.Compile(y)
-					if err != nil {
-						log.Warnf("Ignoring uncompilable expression '%s', will assume one-element enum map, caused by: %s", y, err.Error())
-						continue
-					}
-					mapValue.ByFunction = func(value int64) float64 {
-						result, err := vm.Run(program, map[string]interface{}{x: value})
-						if err != nil {
-							panic(err.Error())
-						}
-						return util.NumericToFloat64(result)
-					}
-					return nil
-				}
+			function, err := convertOneElementMapToFunction(m)
+			if err == nil {
+				mapValue.ByFunction = function
+				return nil
 			}
+			log.Warnf("Assuming one-element enum map, caused by: %s", err.Error())
 		}
 		fallthrough
 	default:
