@@ -43,7 +43,9 @@ func (intervals *Intervals[T]) SortAndConcat() {
 		if current == nil {
 			current = interval
 		}
-		if interval.End+1 == nextInterval.Start {
+		if interval.Start <= nextInterval.Start && interval.End >= nextInterval.End {
+			continue
+		} else if interval.End+1 == nextInterval.Start {
 			current.End = nextInterval.End
 		} else {
 			result = append(result, current)
