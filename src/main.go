@@ -37,7 +37,7 @@ func main() {
 			}
 			prometheus.RegisterHttpHandler("/")
 
-			actuator.RegisterHttpHandler("/actuator")
+			actuator.RegisterHttpHandler("/actuator", config.Actuators, config.Registers)
 
 			listenAndServe(8080)
 			return nil

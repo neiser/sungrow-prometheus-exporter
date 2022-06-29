@@ -104,6 +104,7 @@ func (r *RegisterReader) readWithRetry(address, quantity uint16, writable bool, 
 }
 
 func convertBytesToUInt16(bytes []byte) []uint16 {
+	// TODO maybe use binary.Read?
 	size := len(bytes) / 2
 	result := make([]uint16, size)
 	for i := 0; i < size; i++ {

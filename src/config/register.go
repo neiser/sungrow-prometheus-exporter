@@ -11,17 +11,20 @@ func (registers *Registers) UnmarshalYAML(node *yaml.Node) error {
 	return unmarshalNamedSequenceToMap[Register](node, (*map[string]*Register)(registers))
 }
 
+type RegisterValidation func(float64) bool
+
 type Register struct {
-	Name     string           `yaml:"name"`
-	Type     RegisterType     `yaml:"type"`
-	Address  uint16           `yaml:"address"`
-	Writable bool             `yaml:"writable"`
-	Length   uint16           `yaml:"length"`
-	Unit     string           `yaml:"unit"`
-	MapValue RegisterMapValue `yaml:"mapValue"`
+	Name       string             `yaml:"name"`
+	Type       RegisterType       `yaml:"type"`
+	Address    uint16             `yaml:"address"`
+	Writable   bool               `yaml:"writable"`
+	Validation RegisterValidation `yaml:"validation"`
+	Length     uint16             `yaml:"length"`
+	Unit       string             `yaml:"unit"`
+	MapValue   RegisterMapValue   `yaml:"mapValue"`
 }
 
-func (m Register) getName() string {
+func (m Register) GetKey() string {
 	return m.Name
 }
 
@@ -51,7 +54,7 @@ func (mapValue *RegisterMapValue) UnmarshalYAML(node *yaml.Node) error {
 		return typeError("mapValue should not be empty")
 	case 1:
 		{
-			function, err := convertOneElementMapToFunction(m)
+			function, err := convertOneElementMapToFunction[int64, float64](m)
 			if err == nil {
 				mapValue.ByFunction = function
 				return nil

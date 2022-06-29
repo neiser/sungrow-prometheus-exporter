@@ -34,7 +34,7 @@ func TestInvertAndCompile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				xInverse, err := vm.Run(fInverse, map[string]float64{"x": NumericToFloat64(y)})
+				xInverse, err := vm.Run(fInverse, map[string]float64{"x": NumericToGeneric(y)})
 				if err != nil {
 					t.Fatal(err)
 				}

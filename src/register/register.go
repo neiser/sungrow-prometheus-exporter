@@ -9,12 +9,15 @@ import (
 )
 
 type Reader func(address, quantity uint16, writable bool) ([]uint16, error)
+type Writer func(address, quantity uint16, values []uint16) ([]uint16, error)
 
 type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
 	ReadString(reader Reader) (string, error)
 	getAddressInterval() *util.Interval[uint16]
 }
+
+type Registers map[string]Register
 
 func NewFromConfig(registerConfig *config.Register) Register {
 	switch registerConfig.Type {
@@ -32,6 +35,14 @@ func NewFromConfig(registerConfig *config.Register) Register {
 	panic(fmt.Sprintf("unknown register type '%s'", registerConfig.Type))
 }
 
+func NewFromConfigs(registersConfig config.Registers, registerNames ...string) Registers {
+	r := Registers{}
+	for _, registerName := range registerNames {
+		r[registerName] = NewFromConfig(registersConfig[registerName])
+	}
+	return r
+}
+
 func FindAddressIntervals(registerConfigs config.Registers, registerNames ...string) (readAddressIntervals util.Intervals[uint16], writeAddressIntervals util.Intervals[uint16]) {
 	for _, registerName := range registerNames {
 		registerConfig := registerConfigs[registerName]
@@ -42,6 +53,59 @@ func FindAddressIntervals(registerConfigs config.Registers, registerNames ...str
 		}
 	}
 	return
+}
+
+func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (uint16, error)) (map[string]uint16, error) {
+	type registerInterval struct {
+		addresses     util.Interval[uint16]
+		registerNames []string
+		values        []uint16
+	}
+	var registerIntervals []registerInterval
+
+	merge := func(registerName string, address, value uint16) {
+		for _, i := range registerIntervals {
+			if address+1 == i.addresses.Start {
+				i.addresses.Start = address
+				i.registerNames = append([]string{registerName}, i.registerNames...)
+				i.values = append([]uint16{value}, i.values...)
+				return
+			} else if address == i.addresses.End+1 {
+				i.addresses.End = address
+				i.registerNames = append(i.registerNames, registerName)
+				i.values = append(i.values, value)
+				return
+			}
+		}
+		registerIntervals = append(registerIntervals, registerInterval{
+			util.Interval[uint16]{address, address},
+			[]string{registerName},
+			[]uint16{value}},
+		)
+	}
+
+	for registerName, register := range registers {
+		addressInterval := register.getAddressInterval()
+		if addressInterval.Length() != 1 {
+			return nil, fmt.Errorf("cannot write into register %s with length != 1", registerName)
+		}
+		value, err := valueProvider(registerName)
+		if err != nil {
+			return nil, err
+		}
+		merge(registerName, addressInterval.Start, value)
+	}
+	writtenValues := make(map[string]uint16)
+	for _, i := range registerIntervals {
+		written, err := writer(i.addresses.Start, i.addresses.Length(), i.values)
+		if err != nil {
+			return nil, err
+		}
+		for k, value := range written {
+			writtenValues[i.registerNames[k]] = value
+		}
+	}
+	return writtenValues, nil
 }
 
 type register struct {

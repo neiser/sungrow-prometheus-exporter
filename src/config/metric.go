@@ -5,6 +5,7 @@ import (
 	"github.com/antonmedv/expr/vm"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
+	"sungrow-prometheus-exporter/src/util"
 	"time"
 )
 
@@ -23,7 +24,7 @@ type Metric struct {
 	Labels []*Label   `yaml:"labels"`
 }
 
-func (m Metric) getName() string {
+func (m Metric) GetKey() string {
 	return m.Name
 }
 
@@ -62,32 +63,32 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 		return errors.Wrapf(err, "cannot compile '%s'", s)
 	}
 	registers := make(map[string]float64)
-	env := map[string]interface{}{
-		"timeDate": func(args ...interface{}) (interface{}, error) {
-			location, err := time.LoadLocation(args[6].(string))
-			if err != nil {
-				return nil, err
-			}
-			return time.Date(
-				int(args[0].(float64)),
-				time.Month(args[1].(float64)),
-				int(args[2].(float64)),
-				int(args[3].(float64)),
-				int(args[4].(float64)),
-				int(args[5].(float64)),
-				0,
-				location,
-			), nil
-		},
-		"register": func(args ...interface{}) (interface{}, error) {
+	env := util.BuildEnv(
+		util.Env(
+			"timeDate", func(args ...interface{}) (interface{}, error) {
+				location, err := time.LoadLocation(args[6].(string))
+				if err != nil {
+					return nil, err
+				}
+				return time.Date(
+					int(args[0].(float64)),
+					time.Month(args[1].(float64)),
+					int(args[2].(float64)),
+					int(args[3].(float64)),
+					int(args[4].(float64)),
+					int(args[5].(float64)),
+					0,
+					location,
+				), nil
+			}),
+		util.Env("register", func(args ...interface{}) (interface{}, error) {
 			registerName := args[0].(string)
 			registerValue, found := registers[registerName]
 			if !found {
 				registers[registerName] = 0
 			}
 			return registerValue, nil
-		},
-	}
+		}))
 	_, err = vm.Run(program, env)
 	if err != nil {
 		return errors.Wrapf(err, "cannot run '%s'", s)

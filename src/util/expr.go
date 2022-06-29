@@ -9,6 +9,29 @@ import (
 	"github.com/antonmedv/expr/vm"
 )
 
+type EnvEntry struct {
+	identifier string
+	value      interface{}
+}
+
+func (e EnvEntry) GetKey() string {
+	return e.identifier
+}
+
+func Env(identifier string, value interface{}) *EnvEntry {
+	return &EnvEntry{identifier, value}
+}
+
+func (e EnvEntry) And(es []*EnvEntry) []*EnvEntry {
+	return append(es, &e)
+}
+
+func BuildEnv(envs ...*EnvEntry) map[string]interface{} {
+	return MapFromNamedSlice(func(entry *EnvEntry) interface{} {
+		return entry.value
+	}, envs...)
+}
+
 func InvertAndCompile(input string) (*vm.Program, error) {
 	tree, err := parser.Parse(input)
 	if err != nil {
@@ -85,7 +108,7 @@ func (v *inverterVisitor) Enter(node *ast.Node) {
 	}
 }
 
-func (v *inverterVisitor) Exit(node *ast.Node) {
+func (v *inverterVisitor) Exit(*ast.Node) {
 
 }
 

@@ -8,7 +8,7 @@ import (
 	"sungrow-prometheus-exporter/src/util"
 )
 
-func convertOneElementMapToFunction(m map[string]string) (func(int64) float64, error) {
+func convertOneElementMapToFunction[X int64 | string, R float64 | uint16](m map[string]string, envEntries ...*util.EnvEntry) (func(X) R, error) {
 	if len(m) != 1 {
 		return nil, typeError("expecting mapValue to contain exactly one element")
 	}
@@ -17,29 +17,24 @@ func convertOneElementMapToFunction(m map[string]string) (func(int64) float64, e
 	if err != nil {
 		return nil, err
 	}
-	return func(value int64) float64 {
-		result, err := vm.Run(program, map[string]interface{}{varName: value})
+	return func(value X) R {
+		result, err := vm.Run(program, util.BuildEnv(util.Env(varName, value).And(envEntries)...))
 		if err != nil {
 			panic(err.Error())
 		}
-		return util.NumericToFloat64(result)
+		return util.NumericToGeneric[R](result)
 	}, nil
 }
 
-type named interface {
-	getName() string
-}
-
-func unmarshalNamedSequenceToMap[T named](node *yaml.Node, result *map[string]*T) error {
-	var s []*T
+func unmarshalNamedSequenceToMap[K util.HasKey](node *yaml.Node, result *map[string]*K) error {
+	var s []K
 	err := node.Decode(&s)
 	if err != nil {
 		return err
 	}
-	*result = make(map[string]*T)
-	for _, metric := range s {
-		(*result)[(*metric).getName()] = metric
-	}
+	*result = util.MapFromNamedSlice(func(item K) *K {
+		return &item
+	}, s...)
 	return nil
 }
 

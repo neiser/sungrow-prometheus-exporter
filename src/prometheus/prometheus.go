@@ -108,7 +108,7 @@ func buildValueFunc(reader register.Reader, valueConfig *config.Value, registers
 			if err != nil {
 				panic(err.Error())
 			}
-			return util.NumericToFloat64(value)
+			return util.NumericToGeneric[float64](value)
 		})
 	}
 }
