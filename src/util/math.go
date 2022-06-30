@@ -13,14 +13,14 @@ func Min[T constraints.Ordered](a, b T) T {
 	}
 }
 
-func NumericToGeneric[R float64 | uint16](v interface{}) R {
+func NumericToFloat64(v interface{}) float64 {
 	switch v.(type) {
 	case float64:
-		return R(v.(float64))
+		return v.(float64)
 	case int:
-		return R(v.(int))
+		return float64(v.(int))
 	case int64:
-		return R(v.(int64))
+		return float64(v.(int64))
 	}
 	panic(fmt.Sprintf("value %v is not numeric", v))
 }

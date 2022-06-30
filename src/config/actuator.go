@@ -22,7 +22,7 @@ func (a Actuator) GetKey() string {
 }
 
 type ActuatorMapValue struct {
-	ByFunction func(value string) uint16
+	ByFunction func(value string) float64
 }
 
 func (mapValue *ActuatorMapValue) UnmarshalYAML(node *yaml.Node) error {
@@ -32,7 +32,7 @@ func (mapValue *ActuatorMapValue) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	if len(m) == 1 {
-		function, err := convertOneElementMapToFunction[string, uint16](m,
+		function, err := convertOneElementMapToFunction[string](m, util.Compile, util.NumericToFloat64,
 			util.Env("timeParse", func(value, layout string) time.Time {
 				parse, err := time.Parse(layout, value)
 				if err != nil {

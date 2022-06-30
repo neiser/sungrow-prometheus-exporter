@@ -12,6 +12,13 @@ type Interval[T constraints.Integer] struct {
 
 type Intervals[T constraints.Integer] []*Interval[T]
 
+type IntervalExt[T constraints.Integer, E any] struct {
+	Interval[T]
+	Extensions []E
+}
+
+type IntervalsExt[T constraints.Integer, E any] []*IntervalExt[T, E]
+
 func (i Interval[T]) String() string {
 	return fmt.Sprintf("[%v:%v]", i.Start, i.End)
 }
@@ -56,4 +63,19 @@ func (intervals *Intervals[T]) SortAndConcat() {
 		result = append(result, current)
 	}
 	*intervals = result
+}
+
+func (intervals *IntervalsExt[T, E]) Merge(v T, e E) {
+	for _, i := range *intervals {
+		if v+1 == i.Start {
+			i.Start = v
+			i.Extensions = append([]E{e}, i.Extensions...)
+			return
+		} else if v == i.End+1 {
+			i.End = v
+			i.Extensions = append(i.Extensions, e)
+			return
+		}
+	}
+	*intervals = append(*intervals, &IntervalExt[T, E]{Interval[T]{v, v}, []E{e}})
 }

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path"
-	"strconv"
 	"sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/register"
 	"sungrow-prometheus-exporter/src/util"
@@ -48,27 +47,28 @@ func writeValue(w http.ResponseWriter, actuatorConfig *config.Actuator, value st
 		// TODO use actual writer (from modbus)
 		log.Infof("Would write %d to %d with values %v", address, address+quantity-1, values)
 		return values, nil
-	}, func(registerName string) (uint16, error) {
-		registerConfig := registersConfig[registerName]
+	}, func(registerName string) (*string, *float64) {
 
-		// TODO validation, and consider numeric input (as string)
+		//registerConfig := registersConfig[registerName]
+		//
+		//// TODO validation, and consider numeric input (as string) with inverse map
+		//
+		//if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
+		//	log.Infof("Float: %f", floatValue)
+		//}
 
-		if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
-
+		if mapValue := actuatorConfig.Registers[registerName]; mapValue.ByFunction != nil {
+			return &value, util.PointerTo(mapValue.ByFunction(value))
 		}
-
-		mapValue := actuatorConfig.Registers[registerName]
-		if mapValue.ByFunction != nil {
-			return mapValue.ByFunction(value), nil
-		}
-		if byEnumMap := registerConfig.MapValue.ByEnumMap; len(byEnumMap) > 0 {
-			mappedValue := util.GetMapKeyForValue(registerConfig.MapValue.ByEnumMap, value)
-			if mappedValue != nil {
-				return uint16(*mappedValue), nil
-			}
-		}
-
-		return 0, fmt.Errorf("cannot find value for register %s and '%s'", registerName, value)
+		return &value, nil
+		//if byEnumMap := registerConfig.MapValue.ByEnumMap; len(byEnumMap) > 0 {
+		//	mappedValue := util.GetMapKeyForValue(registerConfig.MapValue.ByEnumMap, value)
+		//	if mappedValue != nil {
+		//		return uint16(*mappedValue), nil
+		//	}
+		//}
+		//
+		//return 0, fmt.Errorf("cannot find value for register %s and '%s'", registerName, value)
 	})
 	if err != nil {
 		panic(err.Error())

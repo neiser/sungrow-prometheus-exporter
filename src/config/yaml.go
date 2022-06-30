@@ -2,27 +2,31 @@ package config
 
 import (
 	"fmt"
-	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
 	"gopkg.in/yaml.v3"
 	"sungrow-prometheus-exporter/src/util"
 )
 
-func convertOneElementMapToFunction[X int64 | string, R float64 | uint16](m map[string]string, envEntries ...*util.EnvEntry) (func(X) R, error) {
+func convertOneElementMapToFunction[X any, Y any](
+	m map[string]string,
+	compiler func(input string) (*vm.Program, error),
+	converter func(interface{}) Y,
+	envEntries ...*util.EnvEntry,
+) (func(X) Y, error) {
 	if len(m) != 1 {
 		return nil, typeError("expecting mapValue to contain exactly one element")
 	}
 	varName, expression := util.GetOnlyMapElement(m)
-	program, err := expr.Compile(expression)
+	program, err := compiler(expression)
 	if err != nil {
 		return nil, err
 	}
-	return func(value X) R {
+	return func(value X) Y {
 		result, err := vm.Run(program, util.BuildEnv(util.Env(varName, value).And(envEntries)...))
 		if err != nil {
 			panic(err.Error())
 		}
-		return util.NumericToGeneric[R](result)
+		return converter(result)
 	}, nil
 }
 

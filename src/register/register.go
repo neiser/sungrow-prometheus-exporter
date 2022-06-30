@@ -55,54 +55,42 @@ func FindAddressIntervals(registerConfigs config.Registers, registerNames ...str
 	return
 }
 
-func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (uint16, error)) (map[string]uint16, error) {
-	type registerInterval struct {
-		addresses     util.Interval[uint16]
-		registerNames []string
-		values        []uint16
-	}
-	var registerIntervals []registerInterval
+type registerNameAndValue struct {
+	registerName string
+	value        uint16
+}
 
-	merge := func(registerName string, address, value uint16) {
-		for _, i := range registerIntervals {
-			if address+1 == i.addresses.Start {
-				i.addresses.Start = address
-				i.registerNames = append([]string{registerName}, i.registerNames...)
-				i.values = append([]uint16{value}, i.values...)
-				return
-			} else if address == i.addresses.End+1 {
-				i.addresses.End = address
-				i.registerNames = append(i.registerNames, registerName)
-				i.values = append(i.values, value)
-				return
-			}
-		}
-		registerIntervals = append(registerIntervals, registerInterval{
-			util.Interval[uint16]{address, address},
-			[]string{registerName},
-			[]uint16{value}},
-		)
-	}
+func (r registerNameAndValue) getValue() uint16 {
+	return r.value
+}
+
+func (r registerNameAndValue) getRegisterName() string {
+	return r.registerName
+}
+
+func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (*string, *float64)) (map[string]uint16, error) {
+
+	registerIntervals := util.IntervalsExt[uint16, registerNameAndValue]{}
 
 	for registerName, register := range registers {
 		addressInterval := register.getAddressInterval()
 		if addressInterval.Length() != 1 {
 			return nil, fmt.Errorf("cannot write into register %s with length != 1", registerName)
 		}
-		value, err := valueProvider(registerName)
-		if err != nil {
-			return nil, err
-		}
-		merge(registerName, addressInterval.Start, value)
+		// TODO validate/map string/floatValue
+		_, floatValue := valueProvider(registerName)
+
+		registerIntervals.Merge(addressInterval.Start, registerNameAndValue{registerName, uint16(*floatValue)})
 	}
 	writtenValues := make(map[string]uint16)
 	for _, i := range registerIntervals {
-		written, err := writer(i.addresses.Start, i.addresses.Length(), i.values)
+		written, err := writer(i.Start, i.Length(), util.MapSlice(i.Extensions, registerNameAndValue.getValue))
 		if err != nil {
 			return nil, err
 		}
+		registerNames := util.MapSlice(i.Extensions, registerNameAndValue.getRegisterName)
 		for k, value := range written {
-			writtenValues[i.registerNames[k]] = value
+			writtenValues[registerNames[k]] = value
 		}
 	}
 	return writtenValues, nil

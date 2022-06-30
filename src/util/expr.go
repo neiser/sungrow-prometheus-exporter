@@ -32,6 +32,10 @@ func BuildEnv(envs ...*EnvEntry) map[string]interface{} {
 	}, envs...)
 }
 
+func Compile(input string) (*vm.Program, error) {
+	return expr.Compile(input)
+}
+
 func InvertAndCompile(input string) (*vm.Program, error) {
 	tree, err := parser.Parse(input)
 	if err != nil {
