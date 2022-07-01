@@ -672,9 +672,9 @@
   address: 13059
   writable: true
   validation:
-    percent: 'percent >= 0.0 && percent <= 50.0'
+    percent: 'percent >= 0.0 && percent <= 0.5'
   mapValue:
-    x: x/10
+    x: x/1000
 
 # W035-W038: not applicable
 

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 	"sungrow-prometheus-exporter/src/util"
@@ -37,7 +38,7 @@ const (
 	StringRegisterType RegisterType = "string"
 )
 
-type RegisterValidation func(value float64) bool
+type RegisterValidation func(value float64) error
 
 func (validation *RegisterValidation) UnmarshalYAML(node *yaml.Node) error {
 	m := map[string]string{}
@@ -50,15 +51,20 @@ func (validation *RegisterValidation) UnmarshalYAML(node *yaml.Node) error {
 		if err != nil {
 			return err
 		}
-		*validation = function
+		*validation = func(value float64) error {
+			if !function(value) {
+				return fmt.Errorf("invalid value '%f'", value)
+			}
+			return nil
+		}
 	}
 	return nil
 }
 
 type RegisterMapValue struct {
 	ByFunction         func(value int64) float64
-	ByEnumMap          map[int64]string
 	GetInverseFunction func() (func(float64) float64, error)
+	ByEnumMap          map[int64]string
 }
 
 func (mapValue *RegisterMapValue) UnmarshalYAML(node *yaml.Node) error {

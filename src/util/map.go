@@ -4,17 +4,16 @@ type HasKey interface {
 	GetKey() string
 }
 
-func MapValues[K comparable, V any, R any](m map[K]V, valueMapper func(V) R) map[K]R {
-	r := make(map[K]R)
-	for k, v := range m {
-		r[k] = valueMapper(v)
-	}
-	return r
-}
-
 func GetKeys[K comparable, V any](m map[K]V) (keys []K) {
 	for k := range m {
 		keys = append(keys, k)
+	}
+	return
+}
+
+func GetValues[K comparable, V any](m map[K]V) (values []V) {
+	for _, v := range m {
+		values = append(values, v)
 	}
 	return
 }

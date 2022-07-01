@@ -17,12 +17,19 @@ const (
 
 func RegisterHttpHandler(basePath string, actuatorsConfig config.Actuators, registersConfig config.Registers) {
 	log.Infof("Serving actuator at path %s/", basePath)
-	http.HandleFunc(basePath+"/", func(writer http.ResponseWriter, request *http.Request) {
-		switch request.Method {
+	http.HandleFunc(basePath+"/", func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, err := w.Write([]byte(fmt.Sprintf("%v", err)))
+				util.PanicOnError(err)
+			}
+		}()
+		switch r.Method {
 		case http.MethodPost:
-			handlePost(writer, request, actuatorsConfig, registersConfig)
+			handlePost(w, r, actuatorsConfig, registersConfig)
 		default:
-			panic(fmt.Sprintf("Unsupported HTTP method %s", request.Method))
+			panic(fmt.Sprintf("Unsupported HTTP method %s", r.Method))
 		}
 	})
 }
@@ -45,11 +52,11 @@ func writeValue(w http.ResponseWriter, actuatorConfig *config.Actuator, value st
 		// TODO use actual writer (from modbus)
 		log.Infof("Would write address range [%d:%d] with values %v", address, address+quantity-1, values)
 		return values, nil
-	}, func(registerName string) (*string, *float64) {
+	}, func(registerName string) (string, *float64) {
 		if mapValue := actuatorConfig.Registers[registerName]; mapValue.ByFunction != nil {
-			return &value, util.PointerTo(mapValue.ByFunction(value))
+			return value, util.PointerTo(mapValue.ByFunction(value))
 		}
-		return &value, nil
+		return value, nil
 	})
 	util.PanicOnError(err)
 	w.Header().Set("Content-Type", contentTypeTextPlain)

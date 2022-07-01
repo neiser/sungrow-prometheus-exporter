@@ -19,6 +19,10 @@ type IntervalSlice[T constraints.Integer, S any] struct {
 
 type IntervalSlices[T constraints.Integer, S any] []*IntervalSlice[T, S]
 
+func NewIntervalSlice[T constraints.Integer, S any](interval *Interval[T], slice ...S) *IntervalSlice[T, S] {
+	return &IntervalSlice[T, S]{*interval, slice}
+}
+
 func (i Interval[T]) String() string {
 	return fmt.Sprintf("[%v:%v]", i.Start, i.End)
 }

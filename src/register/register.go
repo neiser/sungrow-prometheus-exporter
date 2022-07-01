@@ -2,6 +2,7 @@ package register
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
 	"sungrow-prometheus-exporter/src/config"
@@ -15,6 +16,7 @@ type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
 	ReadString(reader Reader) (string, error)
 	getAddressInterval() *util.Interval[uint16]
+	getValueToWrite(valueProvider func() (string, *float64)) uint16
 }
 
 type Registers map[string]Register
@@ -68,7 +70,7 @@ func (r registerNameAndValue) getRegisterName() string {
 	return r.registerName
 }
 
-func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (*string, *float64)) (map[string]uint16, error) {
+func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (string, *float64)) (map[string]uint16, error) {
 
 	registerSlices := util.IntervalSlices[uint16, registerNameAndValue]{}
 
@@ -77,11 +79,12 @@ func (registers Registers) Write(writer Writer, valueProvider func(registerName 
 		if addressInterval.Length() != 1 {
 			return nil, fmt.Errorf("cannot write into register %s with length != 1", registerName)
 		}
-		// TODO validate/map string/floatValue
-		_, floatValue := valueProvider(registerName)
+		value := reg.getValueToWrite(func() (string, *float64) {
+			return valueProvider(registerName)
+		})
 
 		registerSlices = append(registerSlices,
-			&util.IntervalSlice[uint16, registerNameAndValue]{*addressInterval, []registerNameAndValue{{registerName, uint16(*floatValue)}}},
+			util.NewIntervalSlice(addressInterval, registerNameAndValue{registerName, value}),
 		)
 	}
 
@@ -111,9 +114,11 @@ type stringRegister struct {
 }
 
 type mappers struct {
-	mapToInt64   func(data []uint16) int64
-	mapToFloat64 func(value int64) float64
-	mapToString  func(value int64) string
+	mapToInt64     func(data []uint16) int64
+	mapToFloat64   func(value int64) float64
+	mapToString    func(value int64) string
+	mapFromFloat64 func(value float64) uint16
+	mapFromString  func(value string) uint16
 }
 
 type integerRegister struct {
@@ -121,6 +126,20 @@ type integerRegister struct {
 	mappers
 	length   uint16
 	writable bool
+}
+
+func (r *integerRegister) getValueToWrite(valueProvider func() (string, *float64)) uint16 {
+	if !r.writable {
+		panic("register is not writable")
+	}
+	if r.width != 1 {
+		panic("writing register with width > 1 is not supported")
+	}
+	stringValue, floatValue := valueProvider()
+	if floatValue != nil {
+		return r.mapFromFloat64(*floatValue)
+	}
+	return r.mapFromString(stringValue)
 }
 
 func newStringRegister(registerConfig *config.Register) *stringRegister {
@@ -132,6 +151,10 @@ func newStringRegister(registerConfig *config.Register) *stringRegister {
 
 func (r *stringRegister) getAddressInterval() *util.Interval[uint16] {
 	panic("not implemented")
+}
+
+func (r *stringRegister) getValueToWrite(func() (string, *float64)) uint16 {
+	panic("cannot write string register")
 }
 
 func (r *stringRegister) ReadFloat64(Reader, uint16) (float64, error) {
@@ -160,7 +183,7 @@ func mapToString(data []uint16) string {
 }
 
 func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *config.Register) *integerRegister {
-	quantity := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
+	width := uint16(reflect.TypeOf(T(0)).Size() / reflect.TypeOf(uint16(0)).Size())
 	length := uint16(1)
 	if registerConfig.Length > 1 {
 		length = registerConfig.Length
@@ -168,44 +191,77 @@ func newIntegerRegister[T uint16 | uint32 | int16 | int32](registerConfig *confi
 	return &integerRegister{
 		register{
 			registerConfig.Address,
-			quantity,
+			width,
 		},
-		mappers{
-			mapToInt64: func(data []uint16) int64 {
-				result := T(0)
-				for i := uint16(0); i < quantity; i++ {
-					result += T(data[i]) << (16 * i)
-				}
-				return int64(result)
-			},
-			mapToFloat64: func(value int64) float64 {
-				if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
-					if mappedValue, ok := mapper[value]; ok {
-						convertedValue, err := strconv.ParseFloat(mappedValue, 64)
-						if err == nil {
-							return convertedValue
-						}
-					}
-				}
-				if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
-					return mapper(value)
-				}
-				return float64(value)
-			},
-			mapToString: func(value int64) string {
-				if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
-					if mappedValue, ok := mapper[value]; ok {
-						return mappedValue
-					}
-				}
-				if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
-					return fmt.Sprintf("%v", mapper(value))
-				}
-				return fmt.Sprintf("%v", value)
-			},
-		},
+		createMappers[T](registerConfig, width),
 		length,
 		registerConfig.Writable,
+	}
+}
+
+func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Register, width uint16) mappers {
+	inverseFunction := func() func(float64) float64 {
+		if inverseFunctionGetter := registerConfig.MapValue.GetInverseFunction; registerConfig.Writable && inverseFunctionGetter != nil {
+			inverseFunction, err := inverseFunctionGetter()
+			util.PanicOnError(errors.Wrapf(err, "no inverse function for writable register %s", registerConfig.Name))
+			return inverseFunction
+		}
+		return nil
+	}()
+	mapFromFloat64 := func(value float64) uint16 {
+		if validation := registerConfig.Validation; validation != nil {
+			util.PanicOnError(errors.Wrapf(validation(value), "validation failed for writable register %s", registerConfig.Name))
+		}
+		if inverseFunction != nil {
+			return uint16(inverseFunction(value))
+		}
+		return uint16(value)
+	}
+	return mappers{
+		mapToInt64: func(data []uint16) int64 {
+			result := T(0)
+			for i := uint16(0); i < width; i++ {
+				result += T(data[i]) << (16 * i)
+			}
+			return int64(result)
+		},
+		mapToFloat64: func(value int64) float64 {
+			if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
+				if mappedValue, ok := mapper[value]; ok {
+					convertedValue, err := strconv.ParseFloat(mappedValue, 64)
+					if err == nil {
+						return convertedValue
+					}
+				}
+			}
+			if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
+				return mapper(value)
+			}
+			return float64(value)
+		},
+		mapToString: func(value int64) string {
+			if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
+				if mappedValue, ok := mapper[value]; ok {
+					return mappedValue
+				}
+			}
+			if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
+				return fmt.Sprintf("%v", mapper(value))
+			}
+			return fmt.Sprintf("%v", value)
+		},
+		mapFromFloat64: mapFromFloat64,
+		mapFromString: func(value string) uint16 {
+			if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
+				if mappedValue := util.GetMapKeyForValue(mapper, value); mappedValue != nil {
+					return uint16(*mappedValue)
+				}
+				panic(fmt.Sprintf("cannot find value %s in %v", value, util.GetValues(mapper)))
+			}
+			floatValue, err := strconv.ParseFloat(value, 64)
+			util.PanicOnError(err)
+			return mapFromFloat64(floatValue)
+		},
 	}
 }
 

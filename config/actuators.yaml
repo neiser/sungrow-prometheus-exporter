@@ -27,3 +27,11 @@
 - name: start_stop
   registers:
     W008_start_stop: ~
+
+- name: max_state_of_charge
+  registers:
+    W033_max_soc: ~
+
+- name: min_state_of_charge
+  registers:
+    W034_min_soc: ~
