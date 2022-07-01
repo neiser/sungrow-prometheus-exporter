@@ -29,9 +29,7 @@ func RegisterHttpHandler(basePath string, actuatorsConfig config.Actuators, regi
 
 func handlePost(w http.ResponseWriter, r *http.Request, actuatorsConfig config.Actuators, registersConfig config.Registers) {
 	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		panic(err.Error())
-	}
+	util.PanicOnError(err)
 	actuatorName := path.Base(r.URL.Path)
 	actuatorValue := string(body)
 	if actuatorConfig, ok := actuatorsConfig[actuatorName]; ok {
@@ -45,37 +43,16 @@ func writeValue(w http.ResponseWriter, actuatorConfig *config.Actuator, value st
 	registers := register.NewFromConfigs(registersConfig, util.GetKeys(actuatorConfig.Registers)...)
 	writtenRegisters, err := registers.Write(func(address, quantity uint16, values []uint16) ([]uint16, error) {
 		// TODO use actual writer (from modbus)
-		log.Infof("Would write %d to %d with values %v", address, address+quantity-1, values)
+		log.Infof("Would write address range [%d:%d] with values %v", address, address+quantity-1, values)
 		return values, nil
 	}, func(registerName string) (*string, *float64) {
-
-		//registerConfig := registersConfig[registerName]
-		//
-		//// TODO validation, and consider numeric input (as string) with inverse map
-		//
-		//if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
-		//	log.Infof("Float: %f", floatValue)
-		//}
-
 		if mapValue := actuatorConfig.Registers[registerName]; mapValue.ByFunction != nil {
 			return &value, util.PointerTo(mapValue.ByFunction(value))
 		}
 		return &value, nil
-		//if byEnumMap := registerConfig.MapValue.ByEnumMap; len(byEnumMap) > 0 {
-		//	mappedValue := util.GetMapKeyForValue(registerConfig.MapValue.ByEnumMap, value)
-		//	if mappedValue != nil {
-		//		return uint16(*mappedValue), nil
-		//	}
-		//}
-		//
-		//return 0, fmt.Errorf("cannot find value for register %s and '%s'", registerName, value)
 	})
-	if err != nil {
-		panic(err.Error())
-	}
+	util.PanicOnError(err)
 	w.Header().Set("Content-Type", contentTypeTextPlain)
 	_, err = w.Write([]byte(fmt.Sprintf("Wrote %v", writtenRegisters)))
-	if err != nil {
-		panic(err.Error())
-	}
+	util.PanicOnError(err)
 }

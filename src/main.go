@@ -11,6 +11,7 @@ import (
 	"sungrow-prometheus-exporter/src/modbus"
 	"sungrow-prometheus-exporter/src/prometheus"
 	"sungrow-prometheus-exporter/src/register"
+	"sungrow-prometheus-exporter/src/util"
 )
 
 func main() {
@@ -56,7 +57,5 @@ func listenAndServe(port int) {
 	address := fmt.Sprintf(":%d", port)
 	log.Infof("Listening at %s", address)
 	err := http.ListenAndServe(address, nil)
-	if err != nil {
-		panic(err.Error())
-	}
+	util.PanicOnError(err)
 }

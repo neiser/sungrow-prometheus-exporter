@@ -21,7 +21,7 @@ func New(addressIntervals util.Intervals[uint16]) *Cache {
 	if len(addressIntervals) == 0 {
 		return &Cache{}
 	}
-	addressIntervals.SortAndConcat()
+	addressIntervals.SortAndMerge()
 	log.Infof("Initializing cache for address intervals %v", addressIntervals)
 	return &Cache{
 		expiry:           500 * time.Millisecond,

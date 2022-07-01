@@ -23,9 +23,7 @@ func convertOneElementMapToFunction[X any, Y any](
 	}
 	return func(value X) Y {
 		result, err := vm.Run(program, util.BuildEnv(util.Env(varName, value).And(envEntries)...))
-		if err != nil {
-			panic(err.Error())
-		}
+		util.PanicOnError(err)
 		return converter(result)
 	}, nil
 }

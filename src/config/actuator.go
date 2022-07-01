@@ -33,12 +33,12 @@ func (mapValue *ActuatorMapValue) UnmarshalYAML(node *yaml.Node) error {
 	}
 	if len(m) == 1 {
 		function, err := convertOneElementMapToFunction[string](m, util.Compile, util.NumericToFloat64,
-			util.Env("timeParse", func(value, layout string) time.Time {
+			util.Env("timeParse", func(value, layout, timezone string) time.Time {
 				parse, err := time.Parse(layout, value)
-				if err != nil {
-					panic(err.Error())
-				}
-				return parse
+				util.PanicOnError(err)
+				location, err := time.LoadLocation(timezone)
+				util.PanicOnError(err)
+				return parse.In(location)
 			}),
 		)
 		if err != nil {

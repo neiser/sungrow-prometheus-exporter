@@ -33,9 +33,7 @@ func NewReader(address string, readAddressIntervals, writeAddressIntervals util.
 
 func (r *RegisterReader) Close() {
 	err := r.handler.Close()
-	if err != nil {
-		panic(err.Error())
-	}
+	util.PanicOnError(err)
 }
 
 func (r *RegisterReader) Read(address, quantity uint16, writable bool) ([]uint16, error) {

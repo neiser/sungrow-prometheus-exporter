@@ -12,12 +12,12 @@ type Interval[T constraints.Integer] struct {
 
 type Intervals[T constraints.Integer] []*Interval[T]
 
-type IntervalExt[T constraints.Integer, E any] struct {
+type IntervalSlice[T constraints.Integer, S any] struct {
 	Interval[T]
-	Extensions []E
+	Slice []S
 }
 
-type IntervalsExt[T constraints.Integer, E any] []*IntervalExt[T, E]
+type IntervalSlices[T constraints.Integer, S any] []*IntervalSlice[T, S]
 
 func (i Interval[T]) String() string {
 	return fmt.Sprintf("[%v:%v]", i.Start, i.End)
@@ -31,51 +31,77 @@ func (i Interval[T]) Length() T {
 	return i.End - i.Start + 1
 }
 
-func (intervals Intervals[T]) Sort() {
-	slices.SortStableFunc(intervals, func(a, b *Interval[T]) bool {
-		return a.Start < b.Start
-	})
+func (intervals *Intervals[T]) SortAndMerge() {
+	*intervals = sortAndMerge[T, Interval[T]](*intervals)
 }
 
-func (intervals *Intervals[T]) SortAndConcat() {
-	if len(*intervals) < 2 {
-		return
+func (intervalSlices *IntervalSlices[T, S]) SortAndMerge() {
+	*intervalSlices = sortAndMerge[T, IntervalSlice[T, S]](*intervalSlices)
+}
+
+type interval[T constraints.Integer] interface {
+	start() T
+	end() T
+}
+
+type merger[T constraints.Integer, I interval[T]] interface {
+	interval[T]
+	consume(other *I)
+	append(other *I)
+}
+
+func (i Interval[T]) start() T {
+	return i.Start
+}
+
+func (i Interval[T]) end() T {
+	return i.End
+}
+
+func (i Interval[T]) consume(*Interval[T]) {
+	// do nothing
+}
+
+func (i *Interval[T]) append(other *Interval[T]) {
+	i.End = other.End
+}
+
+func (i IntervalSlice[T, S]) start() T {
+	return i.Start
+}
+
+func (i IntervalSlice[T, S]) end() T {
+	return i.End
+}
+
+func (i IntervalSlice[T, S]) consume(*IntervalSlice[T, S]) {
+	panic("cannot consume interval slice")
+}
+
+func (i *IntervalSlice[T, S]) append(other *IntervalSlice[T, S]) {
+	i.End = other.End
+	i.Slice = append(i.Slice, other.Slice...)
+}
+
+func sortAndMerge[T constraints.Integer, I interval[T], M merger[T, I]](ms []M) (result []M) {
+	if len(ms) < 2 {
+		return ms
 	}
-	intervals.Sort()
-	var result Intervals[T]
-	var current *Interval[T]
-	for i := 0; i < len(*intervals)-1; i++ {
-		interval := (*intervals)[i]
-		nextInterval := (*intervals)[i+1]
-		if current == nil {
-			current = interval
-		}
-		if interval.Start <= nextInterval.Start && interval.End >= nextInterval.End {
-			continue
-		} else if interval.End+1 == nextInterval.Start {
-			current.End = nextInterval.End
+	slices.SortStableFunc(ms, func(a, b M) bool {
+		return a.start() < b.start()
+	})
+	current := ms[0]
+	for i := 1; i < len(ms); i++ {
+		nextItem := ms[i]
+		if current.start() <= nextItem.start() && current.end() >= nextItem.end() {
+			current.consume(any(nextItem).(*I))
+		} else if current.end()+1 == nextItem.start() {
+			current.append(any(nextItem).(*I))
 		} else {
 			result = append(result, current)
-			current = nextInterval
+			current = nextItem
 		}
 	}
-	if current != nil {
-		result = append(result, current)
-	}
-	*intervals = result
-}
-
-func (intervals *IntervalsExt[T, E]) Merge(v T, e E) {
-	for _, i := range *intervals {
-		if v+1 == i.Start {
-			i.Start = v
-			i.Extensions = append([]E{e}, i.Extensions...)
-			return
-		} else if v == i.End+1 {
-			i.End = v
-			i.Extensions = append(i.Extensions, e)
-			return
-		}
-	}
-	*intervals = append(*intervals, &IntervalExt[T, E]{Interval[T]{v, v}, []E{e}})
+	result = append(result, current)
+	return
 }

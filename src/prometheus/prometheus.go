@@ -67,18 +67,14 @@ func readStringValue(reader register.Reader, valueConfig *config.Value, register
 	if registerValue := valueConfig.FromRegister; registerValue != nil {
 		registerConfig := registersConfig[registerValue.Name]
 		value, err := register.NewFromConfig(registerConfig).ReadString(reader)
-		if err != nil {
-			panic(err.Error())
-		}
+		util.PanicOnError(err)
 		return value
 	}
 	if expressionConfig := valueConfig.FromExpression; expressionConfig != nil {
 		value, err := expressionConfig.Evaluate(func(registerName string) float64 {
 			return readRegister(registersConfig[registerName], reader, 0)
 		})
-		if err != nil {
-			panic(err.Error())
-		}
+		util.PanicOnError(err)
 		return fmt.Sprintf("%v", value)
 	}
 	panic("cannot read register value for metric")
@@ -105,9 +101,7 @@ func buildValueFunc(reader register.Reader, valueConfig *config.Value, registers
 			value, err := expressionConfig.Evaluate(func(registerName string) float64 {
 				return readRegister(registersConfig[registerName], reader, 0)
 			})
-			if err != nil {
-				panic(err.Error())
-			}
+			util.PanicOnError(err)
 			return util.NumericToFloat64(value)
 		})
 	}

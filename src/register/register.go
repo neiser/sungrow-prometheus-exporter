@@ -70,25 +70,30 @@ func (r registerNameAndValue) getRegisterName() string {
 
 func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (*string, *float64)) (map[string]uint16, error) {
 
-	registerIntervals := util.IntervalsExt[uint16, registerNameAndValue]{}
+	registerSlices := util.IntervalSlices[uint16, registerNameAndValue]{}
 
-	for registerName, register := range registers {
-		addressInterval := register.getAddressInterval()
+	for registerName, reg := range registers {
+		addressInterval := reg.getAddressInterval()
 		if addressInterval.Length() != 1 {
 			return nil, fmt.Errorf("cannot write into register %s with length != 1", registerName)
 		}
 		// TODO validate/map string/floatValue
 		_, floatValue := valueProvider(registerName)
 
-		registerIntervals.Merge(addressInterval.Start, registerNameAndValue{registerName, uint16(*floatValue)})
+		registerSlices = append(registerSlices,
+			&util.IntervalSlice[uint16, registerNameAndValue]{*addressInterval, []registerNameAndValue{{registerName, uint16(*floatValue)}}},
+		)
 	}
+
+	registerSlices.SortAndMerge()
+
 	writtenValues := make(map[string]uint16)
-	for _, i := range registerIntervals {
-		written, err := writer(i.Start, i.Length(), util.MapSlice(i.Extensions, registerNameAndValue.getValue))
+	for _, i := range registerSlices {
+		written, err := writer(i.Start, i.Length(), util.MapSlice(i.Slice, registerNameAndValue.getValue))
 		if err != nil {
 			return nil, err
 		}
-		registerNames := util.MapSlice(i.Extensions, registerNameAndValue.getRegisterName)
+		registerNames := util.MapSlice(i.Slice, registerNameAndValue.getRegisterName)
 		for k, value := range written {
 			writtenValues[registerNames[k]] = value
 		}

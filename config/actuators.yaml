@@ -1,17 +1,17 @@
 - name: clock
   registers:
     W001_system_clock_year:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Year()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Year()"
     W002_system_clock_month:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Month()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Month()"
     W003_system_clock_day:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Day()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Day()"
     W004_system_clock_hour:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Hour()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Hour()"
     W005_system_clock_minute:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Minute()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Minute()"
     W006_system_clock_second:
-      x: "timeParse(x, '2022-06-17 13:04:05 -0700').Second()"
+      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Second()"
   mapValue: >-
     timeDate(
       register('W001_system_clock_year'), 
@@ -21,7 +21,7 @@
       register('W005_system_clock_minute'),
       register('W006_system_clock_second'),
       'Europe/Berlin'
-    ).Format('2022-06-17 13:04:05 -0700')
+    ).Format('2006-01-02 15:04:05 -07')
 
 
 - name: start_stop
