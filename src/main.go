@@ -30,15 +30,15 @@ func main() {
 			readAddressIntervals, writeAddressIntervals := register.FindAddressIntervals(config.Registers,
 				config.Metrics.FindRegisterNames()...,
 			)
-			reader := modbus.NewReader(inverterAddress, readAddressIntervals, writeAddressIntervals)
-			defer reader.Close()
+			readWriter := modbus.NewReadWriter(inverterAddress, readAddressIntervals, writeAddressIntervals)
+			defer readWriter.Close()
 
 			for _, metricConfig := range config.Metrics {
-				prometheus.RegisterMetric(reader.Read, metricConfig, config.Registers)
+				prometheus.RegisterMetric(readWriter, metricConfig, config.Registers)
 			}
 			prometheus.RegisterHttpHandler("/")
 
-			actuator.RegisterHttpHandler("/actuator", config.Actuators, config.Registers)
+			actuator.RegisterHttpHandler("/actuator", readWriter, config.Actuators, config.Registers)
 
 			listenAndServe(8080)
 			return nil

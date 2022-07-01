@@ -13,19 +13,20 @@ func (actuators *Actuators) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type Actuator struct {
-	Name      string `yaml:"name"`
-	Registers map[string]ActuatorMapValue
+	Name                string `yaml:"name"`
+	Registers           map[string]ActuatorRegisterMapValue
+	ValueFromExpression *ExpressionValue `yaml:"valueFromExpression"`
 }
 
 func (a Actuator) GetKey() string {
 	return a.Name
 }
 
-type ActuatorMapValue struct {
+type ActuatorRegisterMapValue struct {
 	ByFunction func(value string) float64
 }
 
-func (mapValue *ActuatorMapValue) UnmarshalYAML(node *yaml.Node) error {
+func (mapValue *ActuatorRegisterMapValue) UnmarshalYAML(node *yaml.Node) error {
 	m := map[string]string{}
 	err := node.Decode(m)
 	if err != nil {

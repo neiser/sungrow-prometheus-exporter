@@ -5,12 +5,23 @@ import (
 	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
+	"strings"
 	"sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/util"
 )
 
-type Reader func(address, quantity uint16, writable bool) ([]uint16, error)
-type Writer func(address, quantity uint16, values []uint16) ([]uint16, error)
+type Reader interface {
+	Read(address, quantity uint16, writable bool) ([]uint16, error)
+}
+
+type Writer interface {
+	Write(address, quantity uint16, values []uint16) ([]uint16, error)
+}
+
+type ReadWriter interface {
+	Reader
+	Writer
+}
 
 type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
@@ -70,7 +81,11 @@ func (r registerNameAndValue) getRegisterName() string {
 	return r.registerName
 }
 
-func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (string, *float64)) (map[string]uint16, error) {
+type WrittenRegisterValues struct {
+	registerSlices util.IntervalSlices[uint16, registerNameAndValue]
+}
+
+func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (string, *float64)) (*WrittenRegisterValues, error) {
 
 	registerSlices := util.IntervalSlices[uint16, registerNameAndValue]{}
 
@@ -90,18 +105,45 @@ func (registers Registers) Write(writer Writer, valueProvider func(registerName 
 
 	registerSlices.SortAndMerge()
 
-	writtenValues := make(map[string]uint16)
-	for _, i := range registerSlices {
-		written, err := writer(i.Start, i.Length(), util.MapSlice(i.Slice, registerNameAndValue.getValue))
+	for _, reg := range registerSlices {
+		written, err := writer.Write(reg.Start, reg.Length(), util.MapSlice(reg.Slice, registerNameAndValue.getValue))
 		if err != nil {
 			return nil, err
 		}
-		registerNames := util.MapSlice(i.Slice, registerNameAndValue.getRegisterName)
 		for k, value := range written {
-			writtenValues[registerNames[k]] = value
+			reg.Slice[k].value = value
 		}
 	}
-	return writtenValues, nil
+	return &WrittenRegisterValues{registerSlices}, nil
+}
+
+func (w WrittenRegisterValues) Read(startAddress, quantity uint16, writable bool) ([]uint16, error) {
+	if !writable {
+		panic("cannot read non-writable registers")
+	}
+	valuesByAddress := make(map[uint16]uint16)
+	for _, reg := range w.registerSlices {
+		for k, value := range util.MapSlice(reg.Slice, registerNameAndValue.getValue) {
+			address := reg.Start + uint16(k)
+			valuesByAddress[address] = value
+		}
+	}
+	result := make([]uint16, quantity)
+	for i := uint16(0); i < quantity; i++ {
+		result[i] = valuesByAddress[startAddress+i]
+	}
+	return result, nil
+}
+
+func (w WrittenRegisterValues) String() string {
+	var result []string
+	for _, reg := range w.registerSlices {
+		registerNames := util.MapSlice(reg.Slice, registerNameAndValue.getRegisterName)
+		for k, value := range util.MapSlice(reg.Slice, registerNameAndValue.getValue) {
+			result = append(result, fmt.Sprintf("%s=%d", registerNames[k], value))
+		}
+	}
+	return strings.Join(result, ", ")
 }
 
 type register struct {
@@ -162,7 +204,7 @@ func (r *stringRegister) ReadFloat64(Reader, uint16) (float64, error) {
 }
 
 func (r *stringRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader(r.baseAddress, r.width, false)
+	data, err := reader.Read(r.baseAddress, r.width, false)
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +312,7 @@ func (r *integerRegister) getAddressInterval() *util.Interval[uint16] {
 }
 
 func (r *integerRegister) ReadString(reader Reader) (string, error) {
-	data, err := reader(r.baseAddress, r.width, r.writable)
+	data, err := reader.Read(r.baseAddress, r.width, r.writable)
 	if err != nil {
 		return "", err
 	}
@@ -281,7 +323,7 @@ func (r *integerRegister) ReadFloat64(reader Reader, index uint16) (float64, err
 	if index >= r.length {
 		panic("register index out of range")
 	}
-	data, err := reader(r.baseAddress+index*r.width, r.width, r.writable)
+	data, err := reader.Read(r.baseAddress+index*r.width, r.width, r.writable)
 	if err != nil {
 		return 0, err
 	}

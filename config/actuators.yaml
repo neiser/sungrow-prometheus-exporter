@@ -1,18 +1,18 @@
 - name: clock
   registers:
     W001_system_clock_year:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Year()"
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Year()"
     W002_system_clock_month:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Month()"
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Month()"
     W003_system_clock_day:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Day()"
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Day()"
     W004_system_clock_hour:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Hour()"
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Hour()"
     W005_system_clock_minute:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Minute()"
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Minute()"
     W006_system_clock_second:
-      x: "timeParse(x, '2006-01-02 15:04:05 -07', 'Europe/Berlin').Second()"
-  mapValue: >-
+      x: "timeParse(x, '2006-01-02 15:04:05 MST', 'Europe/Berlin').Second()"
+  valueFromExpression: >-
     timeDate(
       register('W001_system_clock_year'), 
       register('W002_system_clock_month'),
@@ -21,7 +21,7 @@
       register('W005_system_clock_minute'),
       register('W006_system_clock_second'),
       'Europe/Berlin'
-    ).Format('2006-01-02 15:04:05 -07')
+    ).Format('2006-01-02 15:04:05 MST')
 
 
 - name: start_stop

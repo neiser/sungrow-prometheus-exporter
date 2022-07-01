@@ -12,31 +12,31 @@ import (
 	"time"
 )
 
-type RegisterReader struct {
+type RegisterReadWriter struct {
 	handler    *modbus.TCPClientHandler
 	client     modbus.Client
 	readCache  *cache.Cache
 	writeCache *cache.Cache
 }
 
-func NewReader(address string, readAddressIntervals, writeAddressIntervals util.Intervals[uint16]) *RegisterReader {
+func NewReadWriter(address string, readAddressIntervals, writeAddressIntervals util.Intervals[uint16]) *RegisterReadWriter {
 	handler := modbus.NewTCPClientHandler(address)
 	handler.Timeout = 3 * time.Second
 	handler.IdleTimeout = 5 * time.Second
 	handler.SlaveId = 0x1
 	client := modbus.NewClient(handler)
-	return &RegisterReader{handler, client,
+	return &RegisterReadWriter{handler, client,
 		cache.New(readAddressIntervals),
 		cache.New(writeAddressIntervals),
 	}
 }
 
-func (r *RegisterReader) Close() {
+func (r *RegisterReadWriter) Close() {
 	err := r.handler.Close()
 	util.PanicOnError(err)
 }
 
-func (r *RegisterReader) Read(address, quantity uint16, writable bool) ([]uint16, error) {
+func (r *RegisterReadWriter) Read(address, quantity uint16, writable bool) ([]uint16, error) {
 	c := func() *cache.Cache {
 		if writable {
 			return r.writeCache
@@ -49,13 +49,23 @@ func (r *RegisterReader) Read(address, quantity uint16, writable bool) ([]uint16
 	})
 }
 
+func (r *RegisterReadWriter) Write(address, quantity uint16, values []uint16) ([]uint16, error) {
+	log.Infof("Writing address range %d:%d with values %v", address, address+quantity-1, values)
+	//bytes, err := r.client.WriteMultipleRegisters(address-1, quantity, convertUInt16ToBytes(values))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return convertBytesToUInt16(bytes), nil
+	return nil, nil
+}
+
 const (
 	maxQuantity         = 125
 	maxRetries          = 10
 	initialRetryBackoff = 30 * time.Millisecond
 )
 
-func (r *RegisterReader) readChunked(address, quantity uint16, writable bool) ([]uint16, error) {
+func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool) ([]uint16, error) {
 	var result []byte
 	leftToRead := quantity
 	offset := uint16(0)
@@ -72,7 +82,7 @@ func (r *RegisterReader) readChunked(address, quantity uint16, writable bool) ([
 	return convertBytesToUInt16(result), nil
 }
 
-func (r *RegisterReader) readWithRetry(address, quantity uint16, writable bool, retriesLeft int, backoff time.Duration) ([]byte, error) {
+func (r *RegisterReadWriter) readWithRetry(address, quantity uint16, writable bool, retriesLeft int, backoff time.Duration) ([]byte, error) {
 	chunk, err := func() ([]byte, error) {
 		if writable {
 			return r.client.ReadHoldingRegisters(address-1, quantity)
@@ -107,6 +117,17 @@ func convertBytesToUInt16(bytes []byte) []uint16 {
 	result := make([]uint16, size)
 	for i := 0; i < size; i++ {
 		result[i] = uint16(bytes[2*i+1]) + uint16(bytes[2*i])<<8
+	}
+	return result
+}
+
+func convertUInt16ToBytes(data []uint16) []byte {
+	// TODO maybe use binary.Read?
+	size := len(data)
+	result := make([]byte, 2*size)
+	for i := 0; i < size; i++ {
+		result[2*i] = byte(data[i] >> 8)
+		result[2*i+1] = byte(data[i])
 	}
 	return result
 }
