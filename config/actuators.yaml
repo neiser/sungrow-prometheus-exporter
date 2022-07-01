@@ -23,7 +23,6 @@
       'Europe/Berlin'
     ).Format('2006-01-02 15:04:05 MST')
 
-
 - name: start_stop
   registers:
     W008_start_stop: ~
@@ -35,3 +34,7 @@
 - name: min_state_of_charge
   registers:
     W034_min_soc: ~
+
+- name: export_power_limit
+  registers:
+    W049_export_power_limitation: ~

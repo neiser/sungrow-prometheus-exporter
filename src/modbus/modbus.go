@@ -1,6 +1,7 @@
 package modbus
 
 import (
+	"fmt"
 	"github.com/goburrow/modbus"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -10,6 +11,12 @@ import (
 	"sungrow-prometheus-exporter/src/util"
 	"syscall"
 	"time"
+)
+
+const (
+	maxQuantity         = 125
+	maxRetries          = 10
+	initialRetryBackoff = 30 * time.Millisecond
 )
 
 type RegisterReadWriter struct {
@@ -49,28 +56,22 @@ func (r *RegisterReadWriter) Read(address, quantity uint16, writable bool) ([]ui
 	})
 }
 
-func (r *RegisterReadWriter) Write(address, quantity uint16, values []uint16) ([]uint16, error) {
+func (r *RegisterReadWriter) WriteAndReadBack(address uint16, values []uint16) ([]uint16, error) {
+	quantity := uint16(len(values))
 	log.Infof("Writing address range %d:%d with values %v", address, address+quantity-1, values)
-	//bytes, err := r.client.WriteMultipleRegisters(address-1, quantity, convertUInt16ToBytes(values))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return convertBytesToUInt16(bytes), nil
-	return nil, nil
+	_, err := r.writeWithRetry(address, quantity, convertUInt16ToBytes(values))
+	if err != nil {
+		return nil, err
+	}
+	return r.readChunked(address, quantity, true)
 }
-
-const (
-	maxQuantity         = 125
-	maxRetries          = 10
-	initialRetryBackoff = 30 * time.Millisecond
-)
 
 func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool) ([]uint16, error) {
 	var result []byte
 	leftToRead := quantity
 	offset := uint16(0)
 	for leftToRead > 0 {
-		chunk, err := r.readWithRetry(address+offset, util.Min(leftToRead, maxQuantity), writable, maxRetries, initialRetryBackoff)
+		chunk, err := r.readWithRetry(address+offset, util.Min(leftToRead, maxQuantity), writable)
 		if err != nil {
 			return nil, err
 		}
@@ -82,33 +83,64 @@ func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool
 	return convertBytesToUInt16(result), nil
 }
 
-func (r *RegisterReadWriter) readWithRetry(address, quantity uint16, writable bool, retriesLeft int, backoff time.Duration) ([]byte, error) {
-	chunk, err := func() ([]byte, error) {
-		if writable {
-			return r.client.ReadHoldingRegisters(address-1, quantity)
-		} else {
-			return r.client.ReadInputRegisters(address-1, quantity)
-		}
-	}()
+func (r *RegisterReadWriter) onRetryError() error {
+	// always close handler to force reconnect on next read/write
+	return errors.Wrapf(r.handler.Close(), "cannot close handler after retry error")
+}
+
+func (r *RegisterReadWriter) writeWithRetry(address, quantity uint16, values []byte) (any, error) {
+	return doWithRetry(
+		fmt.Sprintf("write %d[%d]", address, quantity),
+		r.onRetryError,
+		func() (any, error) {
+			return r.client.WriteMultipleRegisters(address-1, quantity, values)
+		},
+	)
+}
+
+func (r *RegisterReadWriter) readWithRetry(address, quantity uint16, writable bool) ([]byte, error) {
+	return doWithRetry(
+		fmt.Sprintf("read %d[%d]", address, quantity),
+		r.onRetryError,
+		func() ([]byte, error) {
+			if writable {
+				return r.client.ReadHoldingRegisters(address-1, quantity)
+			} else {
+				return r.client.ReadInputRegisters(address-1, quantity)
+			}
+		},
+	)
+}
+
+type retry[R any] struct {
+	description string
+	onError     func() error
+	command     func() (R, error)
+}
+
+func doWithRetry[R any](description string, onError func() error, command func() (R, error)) (R, error) {
+	return retry[R]{description, onError, command}.doWithRetry(maxRetries, initialRetryBackoff)
+}
+
+func (r retry[R]) doWithRetry(retriesLeft int, backoff time.Duration) (R, error) {
+	result, err := r.command()
 	if err != nil {
-		// always close handler to force reconnect on next read
-		if err := r.handler.Close(); err != nil {
-			return nil, errors.Wrapf(err, "cannot close handler after error")
+		if err := r.onError(); err != nil {
+			return result, err
 		}
 		// Sungrow inverters have the nasty property to RST the TCP connection whenever
 		// someone else communicates with the device
 		if util.IsAnyError(err, syscall.EPIPE, syscall.ECONNRESET, io.EOF, io.ErrUnexpectedEOF) || os.IsTimeout(err) {
 			if retriesLeft == 0 {
-				return nil, errors.Wrapf(err, "retries exhausted")
+				return result, errors.Wrapf(err, "retries exhausted")
 			}
 			retriesLeft--
-			log.Infof("Re-trying read %d[%d] in %s, %d retries left", address, quantity, backoff, retriesLeft)
+			log.Infof("Re-trying %s in %s, %d retries left", r.description, backoff, retriesLeft)
 			time.Sleep(backoff)
-			return r.readWithRetry(address, quantity, writable, retriesLeft, 2*backoff)
+			return r.doWithRetry(retriesLeft, 2*backoff)
 		}
-		return nil, err
 	}
-	return chunk, err
+	return result, err
 }
 
 func convertBytesToUInt16(bytes []byte) []uint16 {

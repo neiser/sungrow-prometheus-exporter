@@ -91,11 +91,7 @@ func registerHandlers(path string, handlers ...*handler) {
 
 func readValue(writer httpWriter, actuatorConfig *config.Actuator, reader register.Reader, registersConfig config.Registers) {
 	if expressionValue := actuatorConfig.ValueFromExpression; expressionValue != nil {
-		value, err := expressionValue.Evaluate(func(registerName string) float64 {
-			value, err := register.NewFromConfig(registersConfig[registerName]).ReadFloat64(reader, 0)
-			util.PanicOnError(err)
-			return value
-		})
+		value, err := expressionValue.Evaluate(newRegisterValueProvider(registersConfig, reader))
 		util.PanicOnError(err)
 		writer(fmt.Sprintf("%v", value))
 		return
@@ -110,16 +106,24 @@ func readValue(writer httpWriter, actuatorConfig *config.Actuator, reader regist
 	panic(fmt.Sprintf("cannot read actuator %s", actuatorConfig.Name))
 }
 
-func writeValue(httpWriter httpWriter, actuatorConfig *config.Actuator, value string, registerWriter register.Writer, registersConfig config.Registers) {
+func newRegisterValueProvider(registersConfig config.Registers, reader register.Reader) config.RegisterValueProvider {
+	return func(registerName string) float64 {
+		value, err := register.NewFromConfig(registersConfig[registerName]).ReadFloat64(reader, 0)
+		util.PanicOnError(err)
+		return value
+	}
+}
+
+func writeValue(httpWriter httpWriter, actuatorConfig *config.Actuator, value string, readWriter register.ReadWriter, registersConfig config.Registers) {
 	registerNames := util.GetKeys(actuatorConfig.Registers)
 	registers := register.NewFromConfigs(registersConfig, registerNames...)
-	writtenRegisterValues, err := registers.Write(registerWriter, func(registerName string) (string, *float64) {
+	writtenRegisterValues, err := registers.Write(readWriter, func(registerName string) (string, *float64) {
 		if mapValue := actuatorConfig.Registers[registerName]; mapValue.ByFunction != nil {
 			return value, util.PointerTo(mapValue.ByFunction(value))
 		}
 		return value, nil
-	})
+	}, newRegisterValueProvider(registersConfig, readWriter))
 	util.PanicOnError(err)
-	log.Infof("Wrote registers %s", writtenRegisterValues)
+	log.Infof("Registers after write: %s", writtenRegisterValues)
 	readValue(httpWriter, actuatorConfig, writtenRegisterValues, registersConfig)
 }

@@ -61,9 +61,7 @@ func (metrics Metrics) FindRegisterNames() []string {
 			r = append(r, registerValue.Name)
 		}
 		if expressionValue := metric.Value.FromExpression; expressionValue != nil {
-			for registerName := range expressionValue.registers {
-				r = append(r, registerName)
-			}
+			r = append(r, expressionValue.registerNames...)
 		}
 	}
 	return r

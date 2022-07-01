@@ -1,18 +1,13 @@
 package config
 
 import (
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"sungrow-prometheus-exporter/src/util"
 	"time"
 )
 
 type ExpressionValue struct {
-	program   *vm.Program
-	env       map[string]interface{}
-	registers map[string]float64
+	registerFunc
 }
 
 func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
@@ -21,53 +16,30 @@ func (v *ExpressionValue) UnmarshalYAML(node *yaml.Node) error {
 	if err != nil {
 		return err
 	}
-
-	program, err := expr.Compile(s)
-	if err != nil {
-		return errors.Wrapf(err, "cannot compile '%s'", s)
-	}
-	registers := make(map[string]float64)
-	env := util.BuildEnv(
-		util.Env(
-			"timeDate", func(args ...interface{}) (interface{}, error) {
-				location, err := time.LoadLocation(args[6].(string))
-				if err != nil {
-					return nil, err
-				}
-				return time.Date(
-					int(args[0].(float64)),
-					time.Month(args[1].(float64)),
-					int(args[2].(float64)),
-					int(args[3].(float64)),
-					int(args[4].(float64)),
-					int(args[5].(float64)),
-					0,
-					location,
-				), nil
-			}),
-		util.Env("register", func(args ...interface{}) (interface{}, error) {
-			registerName := args[0].(string)
-			registerValue, found := registers[registerName]
-			if !found {
-				registers[registerName] = 0
+	regFunc, err := newRegisterFunc(s, util.Env(
+		"timeDate", func(args ...interface{}) (interface{}, error) {
+			location, err := time.LoadLocation(args[6].(string))
+			if err != nil {
+				return nil, err
 			}
-			return registerValue, nil
+			return time.Date(
+				int(args[0].(float64)),
+				time.Month(args[1].(float64)),
+				int(args[2].(float64)),
+				int(args[3].(float64)),
+				int(args[4].(float64)),
+				int(args[5].(float64)),
+				0,
+				location,
+			), nil
 		}))
-	_, err = vm.Run(program, env)
 	if err != nil {
-		return errors.Wrapf(err, "cannot run '%s'", s)
+		return err
 	}
-	*v = ExpressionValue{program, env, registers}
+	*v = ExpressionValue{*regFunc}
 	return nil
 }
 
-func (v *ExpressionValue) Evaluate(registerValue func(registerName string) float64) (interface{}, error) {
-	for registerName := range v.registers {
-		v.registers[registerName] = registerValue(registerName)
-	}
-	result, err := vm.Run(v.program, v.env)
-	if err != nil {
-		return 0, err
-	}
-	return result, nil
+func (v *ExpressionValue) Evaluate(registerValue RegisterValueProvider) (interface{}, error) {
+	return v.registerFunc.evaluate(registerValue)
 }

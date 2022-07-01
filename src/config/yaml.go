@@ -7,25 +7,32 @@ import (
 	"sungrow-prometheus-exporter/src/util"
 )
 
-func convertOneElementMapToFunction[X any, Y any](
-	m map[string]string,
-	compiler func(input string) (*vm.Program, error),
-	converter func(interface{}) Y,
-	envEntries ...*util.EnvEntry,
-) (func(X) Y, error) {
+type compilerFunc func(input string) (*vm.Program, error)
+
+func expectOneElementMap[R any](m map[string]string, consumer func(key, value string) (R, error)) (R, error) {
 	if len(m) != 1 {
-		return nil, typeError("expecting mapValue to contain exactly one element")
+		var n R
+		return n, typeError("expecting map to contain exactly one element")
 	}
-	varName, expression := util.GetOnlyMapElement(m)
-	program, err := compiler(expression)
-	if err != nil {
-		return nil, err
-	}
-	return func(value X) Y {
-		result, err := vm.Run(program, util.BuildEnv(util.Env(varName, value).And(envEntries)...))
-		util.PanicOnError(err)
-		return converter(result)
-	}, nil
+	return consumer(util.GetOnlyMapElement(m))
+}
+
+func convertOneElementMapToFunction[X any](
+	m map[string]string,
+	compiler compilerFunc,
+	envEntries ...*util.EnvEntry,
+) (func(X) float64, error) {
+	return expectOneElementMap(m, func(varName, expression string) (func(X) float64, error) {
+		program, err := compiler(expression)
+		if err != nil {
+			return nil, err
+		}
+		return func(value X) float64 {
+			result, err := vm.Run(program, util.BuildEnv(util.Env(varName, value).And(envEntries)...))
+			util.PanicOnError(err)
+			return util.NumericToFloat64(result)
+		}, nil
+	})
 }
 
 func unmarshalNamedSequenceToMap[K util.HasKey](node *yaml.Node, result *map[string]*K) error {

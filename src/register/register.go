@@ -15,7 +15,7 @@ type Reader interface {
 }
 
 type Writer interface {
-	Write(address, quantity uint16, values []uint16) ([]uint16, error)
+	WriteAndReadBack(address uint16, values []uint16) ([]uint16, error)
 }
 
 type ReadWriter interface {
@@ -27,7 +27,7 @@ type Register interface {
 	ReadFloat64(reader Reader, index uint16) (float64, error)
 	ReadString(reader Reader) (string, error)
 	getAddressInterval() *util.Interval[uint16]
-	getValueToWrite(valueProvider func() (string, *float64)) uint16
+	getValueToWrite(valueProvider func() (string, *float64), registerValueProvider config.RegisterValueProvider) uint16
 }
 
 type Registers map[string]Register
@@ -85,7 +85,7 @@ type WrittenRegisterValues struct {
 	registerSlices util.IntervalSlices[uint16, registerNameAndValue]
 }
 
-func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (string, *float64)) (*WrittenRegisterValues, error) {
+func (registers Registers) Write(writer Writer, valueProvider func(registerName string) (string, *float64), registerValueProvider config.RegisterValueProvider) (*WrittenRegisterValues, error) {
 
 	registerSlices := util.IntervalSlices[uint16, registerNameAndValue]{}
 
@@ -94,10 +94,10 @@ func (registers Registers) Write(writer Writer, valueProvider func(registerName 
 		if addressInterval.Length() != 1 {
 			return nil, fmt.Errorf("cannot write into register %s with length != 1", registerName)
 		}
-		value := reg.getValueToWrite(func() (string, *float64) {
-			return valueProvider(registerName)
-		})
-
+		value := reg.getValueToWrite(
+			func() (string, *float64) {
+				return valueProvider(registerName)
+			}, registerValueProvider)
 		registerSlices = append(registerSlices,
 			util.NewIntervalSlice(addressInterval, registerNameAndValue{registerName, value}),
 		)
@@ -106,7 +106,7 @@ func (registers Registers) Write(writer Writer, valueProvider func(registerName 
 	registerSlices.SortAndMerge()
 
 	for _, reg := range registerSlices {
-		written, err := writer.Write(reg.Start, reg.Length(), util.MapSlice(reg.Slice, registerNameAndValue.getValue))
+		written, err := writer.WriteAndReadBack(reg.Start, util.MapSlice(reg.Slice, registerNameAndValue.getValue))
 		if err != nil {
 			return nil, err
 		}
@@ -159,8 +159,8 @@ type mappers struct {
 	mapToInt64     func(data []uint16) int64
 	mapToFloat64   func(value int64) float64
 	mapToString    func(value int64) string
-	mapFromFloat64 func(value float64) uint16
-	mapFromString  func(value string) uint16
+	mapFromFloat64 func(value float64, provider config.RegisterValueProvider) uint16
+	mapFromString  func(value string, provider config.RegisterValueProvider) uint16
 }
 
 type integerRegister struct {
@@ -170,7 +170,7 @@ type integerRegister struct {
 	writable bool
 }
 
-func (r *integerRegister) getValueToWrite(valueProvider func() (string, *float64)) uint16 {
+func (r *integerRegister) getValueToWrite(valueProvider func() (string, *float64), registerValueProvider config.RegisterValueProvider) uint16 {
 	if !r.writable {
 		panic("register is not writable")
 	}
@@ -179,9 +179,9 @@ func (r *integerRegister) getValueToWrite(valueProvider func() (string, *float64
 	}
 	stringValue, floatValue := valueProvider()
 	if floatValue != nil {
-		return r.mapFromFloat64(*floatValue)
+		return r.mapFromFloat64(*floatValue, registerValueProvider)
 	}
-	return r.mapFromString(stringValue)
+	return r.mapFromString(stringValue, registerValueProvider)
 }
 
 func newStringRegister(registerConfig *config.Register) *stringRegister {
@@ -195,7 +195,7 @@ func (r *stringRegister) getAddressInterval() *util.Interval[uint16] {
 	panic("not implemented")
 }
 
-func (r *stringRegister) getValueToWrite(func() (string, *float64)) uint16 {
+func (r *stringRegister) getValueToWrite(func() (string, *float64), config.RegisterValueProvider) uint16 {
 	panic("cannot write string register")
 }
 
@@ -250,9 +250,10 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 		}
 		return nil
 	}()
-	mapFromFloat64 := func(value float64) uint16 {
+	mapFromFloat64 := func(value float64, provider config.RegisterValueProvider) uint16 {
 		if validation := registerConfig.Validation; validation != nil {
-			util.PanicOnError(errors.Wrapf(validation(value), "validation failed for writable register %s", registerConfig.Name))
+			err := validation(value, provider)
+			util.PanicOnError(errors.Wrapf(err, "validation failed for writable register %s", registerConfig.Name))
 		}
 		if inverseFunction != nil {
 			return uint16(inverseFunction(value))
@@ -293,7 +294,7 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 			return fmt.Sprintf("%v", value)
 		},
 		mapFromFloat64: mapFromFloat64,
-		mapFromString: func(value string) uint16 {
+		mapFromString: func(value string, provider config.RegisterValueProvider) uint16 {
 			if mapper := registerConfig.MapValue.ByEnumMap; mapper != nil {
 				if mappedValue := util.GetMapKeyForValue(mapper, value); mappedValue != nil {
 					return uint16(*mappedValue)
@@ -302,7 +303,7 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 			}
 			floatValue, err := strconv.ParseFloat(value, 64)
 			util.PanicOnError(err)
-			return mapFromFloat64(floatValue)
+			return mapFromFloat64(floatValue, provider)
 		},
 	}
 }
