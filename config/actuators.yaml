@@ -38,3 +38,19 @@
 - name: export_power_limit
   registers:
     W049_export_power_limitation: ~
+
+- name: export_power_limit_state
+  registers:
+    W058_export_power_limitation: ~
+
+- name: charge_discharge_power
+  registers:
+    W028_charge_discharge_power: ~
+
+- name: off_grid_option
+  registers:
+    W050_off_grid_option: ~
+
+- name: reserved_backup_stage_of_charge
+  registers:
+    W050_off_grid_option: ~

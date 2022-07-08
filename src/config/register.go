@@ -66,7 +66,7 @@ func (validation *RegisterValidation) UnmarshalYAML(node *yaml.Node) error {
 }
 
 type RegisterMapValue struct {
-	ByFunction         func(value int64) float64
+	ByFunction         func(value float64) float64
 	GetInverseFunction func() (func(float64) float64, error)
 	ByEnumMap          map[int64]string
 }
@@ -82,7 +82,7 @@ func (mapValue *RegisterMapValue) UnmarshalYAML(node *yaml.Node) error {
 		return typeError("mapValue should not be empty")
 	case 1:
 		{
-			function, err := convertOneElementMapToFunction[int64](m, util.Compile)
+			function, err := convertOneElementMapToFunction[float64](m, util.Compile)
 			if err == nil {
 				mapValue.ByFunction = function
 				mapValue.GetInverseFunction = func() (func(float64) float64, error) {

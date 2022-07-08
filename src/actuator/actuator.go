@@ -76,11 +76,11 @@ func registerHandlers(path string, handlers ...*handler) {
 					body, err = ioutil.ReadAll(r.Body)
 					util.PanicOnError(err)
 				}
-				writer := httpWriter(func(text string) {
+				writer := func(text string) {
 					w.Header().Add("Content-Type", contentTypeTextPlain)
 					_, err := w.Write([]byte(text))
 					util.PanicOnError(err)
-				})
+				}
 				h.handleFunc(writer, string(body))
 				return
 			}

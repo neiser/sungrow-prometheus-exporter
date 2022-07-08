@@ -278,7 +278,7 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 				}
 			}
 			if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
-				return mapper(value)
+				return mapper(float64(value))
 			}
 			return float64(value)
 		},
@@ -289,7 +289,7 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 				}
 			}
 			if mapper := registerConfig.MapValue.ByFunction; mapper != nil {
-				return fmt.Sprintf("%v", mapper(value))
+				return fmt.Sprintf("%v", mapper(float64(value)))
 			}
 			return fmt.Sprintf("%v", value)
 		},

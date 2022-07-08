@@ -654,6 +654,15 @@
     2: PowerOptimized
     3: Disabled
 
+- name: W028_charge_discharge_power
+  type: u16
+  address: 13052
+  writable: true
+  #validation:
+  #  percent: 'percent >= 0.5 && percent <= 1'
+
+# W025: reserved
+
 # W029: reserved
 
 # W030-W032: not applicable
@@ -689,3 +698,24 @@
   unit: watt
   validation:
     limit: "limit >= register('R028_export_limit_min') && limit <= register('R029_export_limit_max')"
+
+- name: W050_off_grid_option
+  type: u16
+  address: 13075
+  mapValue:
+    0xAA: "Enable"
+    0x55: "Disable"
+
+- name: W058_export_power_limitation
+  type: u16
+  address: 13087
+  mapValue:
+    0xAA: "Enable"
+    0x55: "Disable"
+    0xFFFF: "Args"
+
+# W059: reserved
+
+- name: W060_reserved_soc_for_backup
+  type: u16
+  address: 13100

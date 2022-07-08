@@ -5,6 +5,7 @@ import (
 	"github.com/goburrow/modbus"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/slices"
 	"io"
 	"os"
 	"sungrow-prometheus-exporter/src/modbus/cache"
@@ -14,9 +15,10 @@ import (
 )
 
 const (
-	maxQuantity         = 125
-	maxRetries          = 10
-	initialRetryBackoff = 30 * time.Millisecond
+	maxQuantity = 125
+
+	maxReadWriteRetries          = 10
+	initialReadWriteRetryBackoff = 30 * time.Millisecond
 )
 
 type RegisterReadWriter struct {
@@ -63,7 +65,49 @@ func (r *RegisterReadWriter) WriteAndReadBack(address uint16, values []uint16) (
 	if err != nil {
 		return nil, err
 	}
-	return r.readChunked(address, quantity, true)
+	return r.awaitStableRead(address, values)
+}
+
+func (r *RegisterReadWriter) awaitStableRead(address uint16, expectedValues []uint16) ([]uint16, error) {
+	quantity := uint16(len(expectedValues))
+	var previouslyReadValues [][]uint16
+	var errNotEqual = errors.New("read values not equal to expected values")
+	findUnstableIndexes := func() []int {
+		var unstableIndexes []int
+		for i := 0; i < len(previouslyReadValues)-1; i++ {
+			unstableIndexes = append(unstableIndexes, util.FindUnequalIndexes(previouslyReadValues[i], previouslyReadValues[i+1])...)
+		}
+		if len(unstableIndexes) == 0 {
+			return nil
+		}
+		slices.Sort(unstableIndexes)
+		unstableIndexes = slices.Compact(unstableIndexes)
+		log.Infof("Found unstable indexes %v from previous reads", unstableIndexes)
+		return unstableIndexes
+	}
+	return retry[[]uint16]{
+		description: fmt.Sprintf("stable read %d[%d]", address, quantity),
+		onError: func(commandErr error) (bool, error) {
+			if commandErr == errNotEqual {
+				return true, nil
+			}
+			return false, errors.Wrap(commandErr, "stopped waiting for stable read")
+		},
+		command: func() ([]uint16, error) {
+			readValues, err := r.readChunked(address, quantity, true)
+			log.Infof("Read values %v", readValues)
+			if err != nil {
+				return nil, err
+			}
+			unstableIndexes := findUnstableIndexes()
+			if slices.CompareFunc(expectedValues, readValues, util.CompareIgnoring[uint16](unstableIndexes)) == 0 {
+				return readValues, nil
+			}
+			previouslyReadValues = append(previouslyReadValues, readValues)
+			log.Infof("Awaiting stable read after write, so far %d unstable indexes", len(unstableIndexes))
+			return nil, errNotEqual
+		},
+	}.doWithRetry(6, 100*time.Millisecond)
 }
 
 func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool) ([]uint16, error) {
@@ -83,15 +127,21 @@ func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool
 	return convertBytesToUInt16(result), nil
 }
 
-func (r *RegisterReadWriter) onRetryError() error {
+func (r *RegisterReadWriter) onReadWriteRetryError(commandErr error) (bool, error) {
 	// always close handler to force reconnect on next read/write
-	return errors.Wrapf(r.handler.Close(), "cannot close handler after retry error")
+	err := r.handler.Close()
+	if err != nil {
+		return false, errors.Wrapf(commandErr, "cannot close handler after retry error")
+	}
+	// Sungrow inverters have the nasty property to RST the TCP connection whenever
+	// someone else communicates with the device
+	return util.IsAnyError(commandErr, syscall.EPIPE, syscall.ECONNRESET, io.EOF, io.ErrUnexpectedEOF) || os.IsTimeout(commandErr), nil
 }
 
 func (r *RegisterReadWriter) writeWithRetry(address, quantity uint16, values []byte) (any, error) {
 	return doWithRetry(
 		fmt.Sprintf("write %d[%d]", address, quantity),
-		r.onRetryError,
+		r.onReadWriteRetryError,
 		func() (any, error) {
 			return r.client.WriteMultipleRegisters(address-1, quantity, values)
 		},
@@ -101,7 +151,7 @@ func (r *RegisterReadWriter) writeWithRetry(address, quantity uint16, values []b
 func (r *RegisterReadWriter) readWithRetry(address, quantity uint16, writable bool) ([]byte, error) {
 	return doWithRetry(
 		fmt.Sprintf("read %d[%d]", address, quantity),
-		r.onRetryError,
+		r.onReadWriteRetryError,
 		func() ([]byte, error) {
 			if writable {
 				return r.client.ReadHoldingRegisters(address-1, quantity)
@@ -112,27 +162,24 @@ func (r *RegisterReadWriter) readWithRetry(address, quantity uint16, writable bo
 	)
 }
 
+func doWithRetry[R any](description string, onError func(commandErr error) (bool, error), command func() (R, error)) (R, error) {
+	return retry[R]{description, onError, command}.doWithRetry(maxReadWriteRetries, initialReadWriteRetryBackoff)
+}
+
 type retry[R any] struct {
 	description string
-	onError     func() error
+	onError     func(commandErr error) (bool, error)
 	command     func() (R, error)
 }
 
-func doWithRetry[R any](description string, onError func() error, command func() (R, error)) (R, error) {
-	return retry[R]{description, onError, command}.doWithRetry(maxRetries, initialRetryBackoff)
-}
-
 func (r retry[R]) doWithRetry(retriesLeft int, backoff time.Duration) (R, error) {
-	result, err := r.command()
-	if err != nil {
-		if err := r.onError(); err != nil {
+	result, commandErr := r.command()
+	if commandErr != nil {
+		if shouldRetry, err := r.onError(commandErr); err != nil {
 			return result, err
-		}
-		// Sungrow inverters have the nasty property to RST the TCP connection whenever
-		// someone else communicates with the device
-		if util.IsAnyError(err, syscall.EPIPE, syscall.ECONNRESET, io.EOF, io.ErrUnexpectedEOF) || os.IsTimeout(err) {
+		} else if shouldRetry {
 			if retriesLeft == 0 {
-				return result, errors.Wrapf(err, "retries exhausted")
+				return result, errors.Wrapf(commandErr, "retries exhausted")
 			}
 			retriesLeft--
 			log.Infof("Re-trying %s in %s, %d retries left", r.description, backoff, retriesLeft)
@@ -140,7 +187,7 @@ func (r retry[R]) doWithRetry(retriesLeft int, backoff time.Duration) (R, error)
 			return r.doWithRetry(retriesLeft, 2*backoff)
 		}
 	}
-	return result, err
+	return result, commandErr
 }
 
 func convertBytesToUInt16(bytes []byte) []uint16 {
