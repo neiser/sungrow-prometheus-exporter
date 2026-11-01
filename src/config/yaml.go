@@ -41,9 +41,14 @@ func unmarshalNamedSequenceToMap[K util.HasKey](node *yaml.Node, result *map[str
 	if err != nil {
 		return err
 	}
-	*result = util.MapFromNamedSlice(func(item K) *K {
-		return &item
-	}, s...)
+	*result = make(map[string]*K, len(s))
+	for _, item := range s {
+		key := item.GetKey()
+		if _, found := (*result)[key]; found {
+			return typeError("duplicate name '%s'", key)
+		}
+		(*result)[key] = &item
+	}
 	return nil
 }
 
