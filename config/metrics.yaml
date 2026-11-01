@@ -54,7 +54,6 @@
     fromRegister: R010_daily_output_energy
 
 - name: output_energy_total
-  alias: sunspec_WattHours_WH_Wh
   type: counter
   value:
     fromRegister: R011_total_output_energy
@@ -141,7 +140,6 @@
 
 - name: cabinet_temperature
   type: gauge
-  alias: sunspec_Cabinet_Temperature_TmpCab_C
   value:
     fromRegister: R013_inside_temperature
 
@@ -163,7 +161,6 @@
     fromRegister: R018_mppt2_current
 
 - name: dc_power_total
-  alias: sunspec_DC_Watts_DCW_W
   type: gauge
   value:
     fromRegister: R020_total_dc_power
