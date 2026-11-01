@@ -1,6 +1,7 @@
 package modbus
 
 import (
+	stderrors "errors"
 	"fmt"
 	"github.com/goburrow/modbus"
 	"github.com/pkg/errors"
@@ -128,7 +129,10 @@ func (r *RegisterReadWriter) readChunked(address, quantity uint16, writable bool
 }
 
 func (r *RegisterReadWriter) onReadWriteRetryError(commandErr error) (bool, error) {
-	// always close handler to force reconnect on next read/write
+	if _, ok := stderrors.AsType[*modbus.ModbusError](commandErr); ok {
+		return false, nil
+	}
+	// close handler to force reconnect on next read/write
 	err := r.handler.Close()
 	if err != nil {
 		return false, errors.Wrapf(commandErr, "cannot close handler after retry error")

@@ -13,6 +13,7 @@ type Cache struct {
 	expiry           time.Duration
 	addressIntervals util.Intervals[uint16]
 	values           []uint16
+	errs             []error
 	lastUpdate       time.Time
 	mutex            sync.RWMutex
 }
@@ -27,11 +28,13 @@ func New(addressIntervals util.Intervals[uint16]) *Cache {
 		expiry:           500 * time.Millisecond,
 		addressIntervals: addressIntervals,
 		values:           make([]uint16, getSize(addressIntervals)),
+		errs:             make([]error, len(addressIntervals)),
 	}
 }
 
 func (c *Cache) Read(address uint16, quantity uint16, reader Reader) ([]uint16, error) {
-	if c.isAddressOutsideCache(address, quantity) {
+	intervalIdx := c.findInterval(address, quantity)
+	if intervalIdx < 0 {
 		return reader(address, quantity)
 	}
 	c.mutex.RLock()
@@ -43,13 +46,13 @@ func (c *Cache) Read(address uint16, quantity uint16, reader Reader) ([]uint16, 
 		// check expired again within rw lock
 		// to see if other thread has updated cache in the meantime
 		if c.expired() {
-			err := c.update(reader)
-			if err != nil {
-				return nil, err
-			}
+			c.update(reader)
 		}
 	} else {
 		defer c.mutex.RUnlock()
+	}
+	if err := c.errs[intervalIdx]; err != nil {
+		return nil, err
 	}
 	return c.readCache(address, quantity), nil
 }
@@ -65,14 +68,14 @@ func getSize(addressIntervals util.Intervals[uint16]) uint16 {
 	return endAddress - startAddress + 1
 }
 
-func (c *Cache) isAddressOutsideCache(address uint16, quantity uint16) bool {
+func (c *Cache) findInterval(address uint16, quantity uint16) int {
 	endAddress := address + quantity - 1
-	for _, addressInterval := range c.addressIntervals {
+	for i, addressInterval := range c.addressIntervals {
 		if addressInterval.Contains(address) && addressInterval.End >= endAddress {
-			return false
+			return i
 		}
 	}
-	return true
+	return -1
 }
 
 func (c *Cache) readCache(address uint16, quantity uint16) []uint16 {
@@ -84,19 +87,18 @@ func (c *Cache) expired() bool {
 	return c.lastUpdate.Before(time.Now().Add(-c.expiry))
 }
 
-func (c *Cache) update(reader Reader) error {
+// update reads each interval on its own, so a range the device rejects
+// does not hide the others.
+func (c *Cache) update(reader Reader) {
 	startAddress := c.addressIntervals[0].Start
-	for _, addressInterval := range c.addressIntervals {
-		quantity := addressInterval.Length()
-		data, err := reader(addressInterval.Start, quantity)
+	for i, addressInterval := range c.addressIntervals {
+		data, err := reader(addressInterval.Start, addressInterval.Length())
+		c.errs[i] = err
 		if err != nil {
-			return err
+			log.Warnf("Cannot read address range %v: %s", addressInterval, err)
+			continue
 		}
-		startIdx := addressInterval.Start - startAddress
-		for i := uint16(0); i < quantity; i++ {
-			c.values[startIdx+i] = data[i]
-		}
+		copy(c.values[addressInterval.Start-startAddress:], data)
 	}
 	c.lastUpdate = time.Now()
-	return nil
 }
