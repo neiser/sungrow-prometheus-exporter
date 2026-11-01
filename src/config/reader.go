@@ -1,9 +1,9 @@
 package config
 
 import (
+	"io/fs"
+
 	"gopkg.in/yaml.v3"
-	"os"
-	"path"
 )
 
 type Config struct {
@@ -12,32 +12,24 @@ type Config struct {
 	Actuators Actuators
 }
 
-func Read() (*Config, error) {
-	configDir := getConfigDir()
-	metrics, err := unmarshalFromFile[Metrics](path.Join(configDir, "metrics.yaml"))
+func Read(files fs.FS) (*Config, error) {
+	metrics, err := unmarshalFromFile[Metrics](files, "metrics.yaml")
 	if err != nil {
 		return nil, err
 	}
-	registers, err := unmarshalFromFile[Registers](path.Join(configDir, "registers.yaml"))
+	registers, err := unmarshalFromFile[Registers](files, "registers.yaml")
 	if err != nil {
 		return nil, err
 	}
-	actuators, err := unmarshalFromFile[Actuators](path.Join(configDir, "actuators.yaml"))
+	actuators, err := unmarshalFromFile[Actuators](files, "actuators.yaml")
 	if err != nil {
 		return nil, err
 	}
 	return &Config{*metrics, *registers, *actuators}, nil
 }
 
-func getConfigDir() string {
-	if koDataPath := os.Getenv("KO_DATA_PATH"); len(koDataPath) > 0 {
-		return koDataPath
-	}
-	return "config"
-}
-
-func unmarshalFromFile[T any](filename string) (*T, error) {
-	file, err := os.ReadFile(filename)
+func unmarshalFromFile[T any](files fs.FS, filename string) (*T, error) {
+	file, err := fs.ReadFile(files, filename)
 	if err != nil {
 		return nil, err
 	}

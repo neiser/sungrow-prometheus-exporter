@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
+	"io/fs"
 	"net/http"
 	"os"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	embeddedConfig "sungrow-prometheus-exporter/config"
 	"sungrow-prometheus-exporter/src/actuator"
 	configPkg "sungrow-prometheus-exporter/src/config"
 	"sungrow-prometheus-exporter/src/modbus"
@@ -16,13 +20,17 @@ import (
 
 func main() {
 
-	var inverterAddress string
+	var inverterAddress, listenAddress, configDir string
 
 	rootCmd := &cobra.Command{
 		Use:   "sungrow-prometheus-exporter",
 		Short: "Prometheus Exporter for Sungrow inverters",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config, err := configPkg.Read()
+			var configFiles fs.FS = embeddedConfig.Files
+			if configDir != "" {
+				configFiles = os.DirFS(configDir)
+			}
+			config, err := configPkg.Read(configFiles)
 			if err != nil {
 				return err
 			}
@@ -40,12 +48,14 @@ func main() {
 
 			actuator.RegisterHttpHandler("/actuator", readWriter, config.Actuators, config.Registers)
 
-			listenAndServe(8080)
+			listenAndServe(listenAddress)
 			return nil
 		},
 	}
 
 	rootCmd.Flags().StringVar(&inverterAddress, "inverter-address", "sungrow:502", "Address as 'host:port' of inverter")
+	rootCmd.Flags().StringVar(&listenAddress, "listen-address", ":8080", "Address as 'host:port' to serve metrics and actuators on")
+	rootCmd.Flags().StringVar(&configDir, "config-dir", "", "Directory with metrics.yaml, registers.yaml and actuators.yaml (default: the embedded files)")
 
 	if err := rootCmd.Execute(); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
@@ -53,8 +63,7 @@ func main() {
 	}
 }
 
-func listenAndServe(port int) {
-	address := fmt.Sprintf(":%d", port)
+func listenAndServe(address string) {
 	log.Infof("Listening at %s", address)
 	err := http.ListenAndServe(address, nil)
 	util.PanicOnError(err)
