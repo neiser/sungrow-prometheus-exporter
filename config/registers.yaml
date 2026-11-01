@@ -267,19 +267,20 @@
   mapValue:
     x: x/10
 
+# Newer firmware reports these signed; the metrics keep the magnitude.
 - name: R064_battery_current
-  type: u16
+  type: s16
   address: 13021
   unit: ampere
   mapValue:
-    x: x/10
+    x: abs(x)/10
 
 - name: R065_battery_power
-  type: u16
+  type: s16
   address: 13022
   unit: watt
   mapValue:
-    x: x
+    x: abs(x)
 
 - name: R066_battery_level
   type: u16
