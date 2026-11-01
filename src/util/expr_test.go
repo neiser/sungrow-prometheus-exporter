@@ -1,8 +1,8 @@
 package util
 
 import (
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/vm"
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

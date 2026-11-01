@@ -2,7 +2,7 @@ package util
 
 import (
 	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 func MapSlice[T any, R any](ts []T, mapper func(T) R) (rs []R) {

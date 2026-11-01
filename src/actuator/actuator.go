@@ -3,7 +3,7 @@ package actuator
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path"
 	"strings"
@@ -73,7 +73,7 @@ func registerHandlers(path string, handlers ...*handler) {
 				var body []byte
 				if r.Body != nil {
 					var err error
-					body, err = ioutil.ReadAll(r.Body)
+					body, err = io.ReadAll(r.Body)
 					util.PanicOnError(err)
 				}
 				writer := func(text string) {

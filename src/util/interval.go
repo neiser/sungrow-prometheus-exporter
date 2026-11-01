@@ -1,9 +1,10 @@
 package util
 
 import (
+	"cmp"
 	"fmt"
 	"golang.org/x/exp/constraints"
-	"golang.org/x/exp/slices"
+	"slices"
 )
 
 type Interval[T constraints.Integer] struct {
@@ -91,8 +92,8 @@ func sortAndMerge[T constraints.Integer, I interval[T], M merger[T, I]](ms []M) 
 	if len(ms) < 2 {
 		return ms
 	}
-	slices.SortStableFunc(ms, func(a, b M) bool {
-		return a.start() < b.start()
+	slices.SortStableFunc(ms, func(a, b M) int {
+		return cmp.Compare(a.start(), b.start())
 	})
 	current := ms[0]
 	for i := 1; i < len(ms); i++ {

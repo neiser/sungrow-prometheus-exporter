@@ -2,7 +2,7 @@ package util
 
 import (
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/exp/slices"
+	"slices"
 	"testing"
 )
 

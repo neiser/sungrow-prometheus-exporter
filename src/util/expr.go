@@ -3,10 +3,10 @@ package util
 import (
 	"errors"
 	"fmt"
-	"github.com/antonmedv/expr"
-	"github.com/antonmedv/expr/ast"
-	"github.com/antonmedv/expr/parser"
-	"github.com/antonmedv/expr/vm"
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/parser"
+	"github.com/expr-lang/expr/vm"
 )
 
 type EnvEntry struct {
@@ -82,7 +82,7 @@ func findInverse(node *ast.Node) (*ast.Node, error) {
 		inverse:         inverse,
 		identifierValue: &inverse.Value,
 	}
-	ast.Walk(node, &v)
+	v.walk(*node)
 	if v.err != nil {
 		return nil, v.err
 	}
@@ -95,25 +95,26 @@ type inverterVisitor struct {
 	err             error
 }
 
-func (v *inverterVisitor) Enter(node *ast.Node) {
-	switch n := (*node).(type) {
+// walk visits parents before children, which the inversion relies on.
+func (v *inverterVisitor) walk(node ast.Node) {
+	if v.err != nil {
+		return
+	}
+	switch n := node.(type) {
 	case *ast.BinaryNode:
 		v.invertBinaryNode(n)
+		v.walk(n.Left)
+		v.walk(n.Right)
 	case *ast.IdentifierNode:
 		if len(*v.identifierValue) > 0 {
 			v.err = errors.New("found more than one identifier node")
 		} else {
 			*(v.identifierValue) = n.Value
 		}
+	case *ast.IntegerNode, *ast.FloatNode:
 	default:
-		if v.err != nil { // keep first error while walking
-			v.err = fmt.Errorf("cannot find inverse of node %s", ast.Dump(*node))
-		}
+		v.err = fmt.Errorf("cannot find inverse of node %s", ast.Dump(node))
 	}
-}
-
-func (v *inverterVisitor) Exit(*ast.Node) {
-
 }
 
 func (v *inverterVisitor) invertBinaryNode(node *ast.BinaryNode) {

@@ -309,7 +309,7 @@ func createMappers[T uint16 | uint32 | int16 | int32](registerConfig *config.Reg
 }
 
 func (r *integerRegister) getAddressInterval() *util.Interval[uint16] {
-	return &util.Interval[uint16]{r.baseAddress, r.baseAddress + (r.length-1)*r.width + (r.width - 1)}
+	return &util.Interval[uint16]{Start: r.baseAddress, End: r.baseAddress + (r.length-1)*r.width + (r.width - 1)}
 }
 
 func (r *integerRegister) ReadString(reader Reader) (string, error) {

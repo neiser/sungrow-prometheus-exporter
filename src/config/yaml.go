@@ -2,7 +2,7 @@ package config
 
 import (
 	"fmt"
-	"github.com/antonmedv/expr/vm"
+	"github.com/expr-lang/expr/vm"
 	"gopkg.in/yaml.v3"
 	"sungrow-prometheus-exporter/src/util"
 )
@@ -48,5 +48,5 @@ func unmarshalNamedSequenceToMap[K util.HasKey](node *yaml.Node, result *map[str
 }
 
 func typeError(msg string, a ...any) error {
-	return &yaml.TypeError{Errors: []string{fmt.Sprintf(msg, a)}}
+	return &yaml.TypeError{Errors: []string{fmt.Sprintf(msg, a...)}}
 }
